@@ -12,11 +12,12 @@ import { useImageSectionHandler } from './useImageSectionHandler';
 export default function ImageSection({ el }: { el: ImageEl }) {
   const h = useImageSectionHandler(el);
   return (
-    <Section title="Photo">
+    <Section title={el.isBg ? 'Background image' : 'Photo'}>
       <div className="g2">
         <button className="btn primary" onClick={h.upload}>{h.has ? 'Replace' : 'Upload photo'}</button>
         <button className="btn danger" onClick={h.empty} disabled={!el.src}>Empty frame</button>
       </div>
+      {el.isBg && <button className="btn" onClick={h.fitToPage} style={{ width: '100%', marginTop: 8 }}>Fit to page</button>}
       {!h.isSample && <button className="btn" onClick={h.useSample} style={{ width: '100%', marginTop: 8 }}>Use a sample photo</button>}
       <div style={{ height: 10 }} />
       <SegField label="Fit" options={[['cover', 'Fill frame'], ['contain', 'Show whole']] as const} {...h.bind('fit')} />

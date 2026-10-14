@@ -1,5 +1,6 @@
 import { DW, MONTHS, PAPERS } from './constants';
-import type { CalendarDoc, Page, PageDims } from './types';
+import { mkImage } from './factories';
+import type { CalendarDoc, ImageEl, Page, PageDims } from './types';
 import { clone, uid } from './utils';
 
 export function dims(pg: Page): PageDims {
@@ -71,7 +72,7 @@ export function makeYear(doc: CalendarDoc): number {
 
 /**
  * Copies the current page's layout onto every other page with the same role.
- * Each page keeps its own month, uploaded photos and per-day details.
+ * Each page keeps its own month, uploaded photos, background images and per-day details.
  * Mutates `doc` and returns how many pages changed.
  */
 export function syncDesign(doc: CalendarDoc): number {
@@ -81,8 +82,10 @@ export function syncDesign(doc: CalendarDoc): number {
     if (p === cur || p.role !== cur.role) return;
     n++;
     const oc = p.els.filter((e) => e.type === 'cal');
-    const oi = p.els.filter((e) => e.type === 'image');
-    let ci = 0, ii = 0;
+    // Backgrounds and ordinary photos are matched separately, so a month's photo never lands in its background.
+    const oi = p.els.filter((e) => e.type === 'image' && !e.isBg);
+    const ob = p.els.filter((e) => e.type === 'image' && e.isBg);
+    let ci = 0, ii = 0, bi = 0;
     p.els = clone(cur.els).map((e) => {
       e.id = uid();
       if (e.type === 'cal') {
@@ -90,7 +93,7 @@ export function syncDesign(doc: CalendarDoc): number {
         e.days = o && o.type === 'cal' ? clone(o.days) : {};
       }
       if (e.type === 'image') {
-        const o = oi[ii++];
+        const o = e.isBg ? ob[bi++] : oi[ii++];
         if (o && o.type === 'image' && o.src && o.src !== '@sample') {
           e.src = o.src;
           e.zoom = o.zoom;
@@ -111,4 +114,32 @@ export function assetInUse(doc: CalendarDoc, id: string): boolean {
   return doc.pages.some((p) =>
     p.els.some((e) => (e.type === 'image' && e.src === id) || (e.type === 'cal' && Object.values(e.days).some((d) => d.img === id))),
   );
+}
+
+/** A full-page background image, to be put behind everything on `pg`. */
+export function mkBackground(pg: Page, src = ''): ImageEl {
+  const D = dims(pg);
+  return mkImage({ name: 'Background', isBg: true, x: 0, y: 0, w: D.W, h: D.H, src });
+}
+
+/** The page's first background image, created full-page at the back when there is none. */
+export function ensureBackground(pg: Page): ImageEl {
+  const found = pg.els.find((e): e is ImageEl => e.type === 'image' && !!e.isBg);
+  if (found) return found;
+  const b = mkBackground(pg);
+  pg.els.unshift(b);
+  return b;
+}
+
+type LegacyPage = Page & { bgImg?: string; bgFit?: 'cover' | 'contain'; bgOp?: number };
+
+/** Turns an older page-wide background photo into a background image element. Mutates `doc`. */
+export function migrateDoc(doc: CalendarDoc): CalendarDoc {
+  for (const p of doc.pages as LegacyPage[]) {
+    if (p.bgImg) p.els.unshift({ ...mkBackground(p, p.bgImg), fit: p.bgFit ?? 'cover', op: p.bgOp ?? 1 });
+    delete p.bgImg;
+    delete p.bgFit;
+    delete p.bgOp;
+  }
+  return doc;
 }

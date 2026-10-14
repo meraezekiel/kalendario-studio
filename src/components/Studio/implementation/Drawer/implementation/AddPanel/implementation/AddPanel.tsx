@@ -4,7 +4,7 @@ import ShapeElement from '@/components/PageView/implementation/ElementView/imple
 import { useAddPanelHandler } from './useAddPanelHandler';
 
 export default function AddPanel() {
-  const { shapes, addPreset, addShape } = useAddPanelHandler();
+  const { shapes, addPreset, addShape, addBackground } = useAddPanelHandler();
   return (
     <>
       <section>
@@ -36,6 +36,13 @@ export default function AddPanel() {
           <button className="btn" onClick={() => addPreset('circle')}>Circle</button>
           <button className="btn" onClick={() => addPreset('polaroid')}>Polaroid</button>
         </div>
+      </section>
+      <section>
+        <h3>Background</h3>
+        <button className="btn" style={{ width: '100%' }} onClick={addBackground}>Background image</button>
+        <p className="hint" style={{ marginTop: 8 }}>
+          Starts as big as the page, behind everything else. Drag its corners to set how wide and tall it is, or drag it to move it.
+        </p>
       </section>
       <section>
         <h3>Shapes &amp; decorations</h3>

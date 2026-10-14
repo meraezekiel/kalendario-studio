@@ -32,8 +32,9 @@ export default function PagesPanel() {
         <CheckField label="Show Philippine holidays" value={h.showHolidays} onChange={h.setHolidays} />
         <ConfirmButton className="btn primary" style={{ width: '100%', marginBottom: 8 }} onConfirm={h.fillYear}>Fill the rest of the year from this design</ConfirmButton>
         <ConfirmButton style={{ width: '100%' }} onConfirm={h.applyDesignToAll}>Copy this page&apos;s design to all months</ConfirmButton>
+        <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={h.monthBackgrounds}>Backgrounds for each month</button>
         <p className="hint" style={{ marginTop: 8 }}>
-          Fill the rest of the year makes one copy per month and replaces the other pages. Copy design keeps each month&apos;s own photos and day details. Pages marked photo only copy to other photo pages.
+          Fill the rest of the year makes one copy per month and replaces the other pages. Copy design keeps each month&apos;s own photos and day details. Pages marked photo only copy to other photo pages. Backgrounds for each month puts the images you pick into the background of this page and the ones after it, in file-name order (01-jan, 02-feb, …).
         </p>
       </section>
     </>

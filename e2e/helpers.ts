@@ -5,7 +5,11 @@ export async function openStudio(page: Page) {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
-    if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text());
+    if (m.type() !== 'error' || /fonts\.(googleapis|gstatic)/.test(m.text())) return;
+    // Network hiccups loading external resources (Google Fonts) are not app errors.
+    const from = m.location().url;
+    if (/^Failed to load resource/.test(m.text()) && from && !from.startsWith(new URL(page.url()).origin)) return;
+    errors.push(m.text());
   });
   await page.goto('/');
   await expect(page.locator('.ph .page')).toBeVisible();

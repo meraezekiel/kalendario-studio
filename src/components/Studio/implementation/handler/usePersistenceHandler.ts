@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { get, set } from 'idb-keyval';
+import { migrateDoc } from '@/lib/calendar/document';
 import type { CalendarDoc } from '@/lib/calendar/types';
 import { STORAGE_KEY, toast, useStudioStore } from '@/store/useStudioStore';
 
@@ -18,7 +19,7 @@ export function usePersistenceHandler() {
       .then((saved) => {
         if (cancelled) return;
         const st = useStudioStore.getState();
-        st.hydrate(isDoc(saved) ? { ...saved, cur: Math.min(saved.cur, saved.pages.length - 1) } : null);
+        st.hydrate(isDoc(saved) ? migrateDoc({ ...saved, cur: Math.min(saved.cur, saved.pages.length - 1) }) : null);
         unsub = useStudioStore.subscribe((s, prev) => {
           if (s.doc === prev.doc) return;
           clearTimeout(timer);

@@ -8,7 +8,8 @@
     "start": "next start -p 3100",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "graphics": "node scripts/build-graphics.mjs && node scripts/build-peeps.mjs"
   },
   "dependencies": {
     "html-to-image": "^1.11.13",
@@ -20,6 +21,10 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@iconify-json/fluent-emoji": "^1.2.7",
+    "@iconify-json/fluent-emoji-flat": "^1.2.6",
+    "@iconify-json/mdi": "^1.2.3",
+    "@opeepsfun/open-peeps": "^1.0.6",
     "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",

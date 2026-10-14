@@ -4,6 +4,7 @@ import ArrangeSection from './ArrangeSection/implementation/ArrangeSection';
 import CalendarSection from './CalendarSection/implementation/CalendarSection';
 import DaySection from './DaySection/implementation/DaySection';
 import EventsSection from './EventsSection/implementation/EventsSection';
+import GraphicSection from './GraphicSection/implementation/GraphicSection';
 import ImageSection from './ImageSection/implementation/ImageSection';
 import LayersSection from './LayersSection/implementation/LayersSection';
 import MultiSection from './MultiSection/implementation/MultiSection';
@@ -26,6 +27,7 @@ export default function Inspector() {
       {el?.type === 'shape' && <ShapeSection el={el} />}
       {el?.type === 'cal' && <CalendarSection el={el} />}
       {el?.type === 'events' && <EventsSection el={el} />}
+      {el?.type === 'graphic' && <GraphicSection el={el} />}
       {el && <ArrangeSection key={el.id} el={el} />}
       <LayersSection />
     </aside>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calendarLayout } from './calendarLayout';
-import { dims, makeYear, monthOf, syncDesign, tok } from './document';
+import { assetInUse, dims, ensureBackground, makeYear, migrateDoc, monthOf, syncDesign, tok } from './document';
 import { mkCal, mkImage, mkPage, mkText } from './factories';
 import { easter, holidays } from './holidays';
 import { TEMPLATES } from './templates';
@@ -78,4 +78,32 @@ describe('makeYear / syncDesign', () => {
     expect(img.type === 'image' && img.src).toBe('a1');
     expect(cal.type === 'cal' && cal.days[3].label).toBe('Fiesta');
   });
-});
+  it('matches background images separately from ordinary photos', () => {
+    const d = docWith([
+      mkPage('A4', 'p', '#fff', [mkImage({ isBg: true, src: 'jan', w: 500 }), mkImage({ src: '@sample' })]),
+      // February has its own photo but no background yet; March has its own background.
+      { ...mkPage('A4', 'p', '#fff', [mkImage({ src: 'febPhoto' })]), month: 1 },
+      { ...mkPage('A4', 'p', '#fff', [mkImage({ isBg: true, src: 'mar' }), mkImage({ src: 'marPhoto' })]), month: 2 },
+    ]);
+    syncDesign(d);
+    const srcs = (i: number) => d.pages[i].els.map((e) => (e.type === 'image' ? `${e.isBg ? 'bg:' : ''}${e.src}` : e.type));
+    expect(srcs(1)).toEqual(['bg:jan', 'febPhoto']);
+    expect(srcs(2)).toEqual(['bg:mar', 'marPhoto']);
+    expect(d.pages[2].els[0].w).toBe(500); // layout (size) comes from the design page
+  });
+  it('creates a full-page background at the back only when missing', () => {
+    const pg = mkPage('Legal', 'p', '#fff', [mkText()]);
+    const b = ensureBackground(pg);
+    expect(pg.els[0]).toBe(b);
+    expect(b).toMatchObject({ isBg: true, x: 0, y: 0, w: 794, h: 1308 });
+    expect(ensureBackground(pg)).toBe(b);
+    expect(pg.els.length).toBe(2);
+  });
+  it('turns an old page-wide background into a background image', () => {
+    const old = { ...mkPage('A4', 'p', '#fff', [mkText()]), bgImg: 'a1', bgFit: 'contain', bgOp: 0.5 };
+    const d = migrateDoc(docWith([old as typeof old & ReturnType<typeof mkPage>]));
+    const [bg] = d.pages[0].els;
+    expect(bg).toMatchObject({ type: 'image', isBg: true, src: 'a1', fit: 'contain', op: 0.5, w: 794, h: 1123 });
+    expect('bgImg' in d.pages[0]).toBe(false);
+    expect(assetInUse(d, 'a1')).toBe(true);
+  });});

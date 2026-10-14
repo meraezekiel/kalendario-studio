@@ -5,6 +5,7 @@ import type { RenderCtx } from '@/lib/calendar/render';
 import type { El, Page } from '@/lib/calendar/types';
 import CalendarElement from './CalendarElement/implementation/CalendarElement';
 import EventsElement from './EventsElement/implementation/EventsElement';
+import GraphicElement from './GraphicElement/implementation/GraphicElement';
 import ImageElement from './ImageElement/implementation/ImageElement';
 import ShapeElement from './ShapeElement/implementation/ShapeElement';
 import TextElement from './TextElement/implementation/TextElement';
@@ -25,12 +26,13 @@ function ElementView({ el, page, ctx, crop, selDay, editDay, editText }: Props) 
   const { style, className } = useElementViewHandler(el, crop);
   if (el.hidden) return null;
   return (
-    <div className={className} data-id={el.id} style={style}>
+    <div className={className} data-id={el.id} data-bg={el.type === 'image' && el.isBg ? '' : undefined} style={style}>
       {el.type === 'text' && <TextElement el={el} page={page} ctx={ctx} editing={editText} />}
       {el.type === 'image' && <ImageElement el={el} page={page} ctx={ctx} />}
       {el.type === 'shape' && <ShapeElement el={el} />}
       {el.type === 'cal' && <CalendarElement el={el} page={page} ctx={ctx} selDay={selDay} editDay={editDay} />}
       {el.type === 'events' && <EventsElement el={el} page={page} ctx={ctx} />}
+      {el.type === 'graphic' && <GraphicElement el={el} />}
     </div>
   );
 }

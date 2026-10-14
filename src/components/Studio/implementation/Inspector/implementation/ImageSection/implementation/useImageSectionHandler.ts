@@ -1,6 +1,6 @@
 import { assetFor } from '@/lib/calendar/render';
 import type { ImageEl } from '@/lib/calendar/types';
-import { pickFiles } from '@/store/actions';
+import { fitToPage, pickFiles } from '@/store/actions';
 import { curPage, updateEl, useStudioStore } from '@/store/useStudioStore';
 import { useBindHandler } from '../../handler/useBindHandler';
 
@@ -20,6 +20,7 @@ export function useImageSectionHandler(el: ImageEl) {
       set({ cropId: null });
       updateEl<ImageEl>(el.id, { src: '' });
     },
+    fitToPage: () => fitToPage(el.id),
     useSample: () => updateEl<ImageEl>(el.id, { src: '@sample' }),
     toggleCrop: () => set({ cropId: cropping ? null : el.id }),
     circle: () => {

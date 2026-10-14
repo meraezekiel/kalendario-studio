@@ -15,10 +15,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* CORS mode lets the PNG exporter read the font rules instead of failing on a cross-origin stylesheet. */}
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link rel="stylesheet" href={FONTS_URL} />
+        <link rel="stylesheet" href={FONTS_URL} crossOrigin="anonymous" />
         <style id="pagesize">{'@page{size:210mm 297mm;margin:0}'}</style>
       </head>
       <body>{children}</body>

@@ -42,3 +42,5 @@ export const ASPECT_SHAPES: ShapeKind[] = ['heart', 'star', 'flower', 'burst'];
 
 /** Drag-and-drop data type for photos dragged from the tray. */
 export const ASSET_MIME = 'text/x-asset';
+/** Drag data type for a graphic dragged from the Graphics panel. */
+export const GRAPHIC_MIME = 'text/x-graphic';

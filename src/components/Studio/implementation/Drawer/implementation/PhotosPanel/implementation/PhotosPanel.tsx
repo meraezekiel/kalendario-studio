@@ -3,7 +3,7 @@
 import { usePhotosPanelHandler } from './usePhotosPanelHandler';
 
 export default function PhotosPanel() {
-  const { items, armed, upload, toggleArm, addToPage, remove, onDragStart } = usePhotosPanelHandler();
+  const { items, armed, upload, toggleArm, addToPage, setAsBackground, remove, onDragStart } = usePhotosPanelHandler();
   return (
     <section>
       <h3>Your photos</h3>
@@ -22,7 +22,8 @@ export default function PhotosPanel() {
               style={{ backgroundImage: `url('${src}')` }}
             >
               <button className="x" aria-label="Remove photo" onClick={(e) => { e.stopPropagation(); remove(i); }}>✕</button>
-              <button aria-label="Add to page" onClick={(e) => { e.stopPropagation(); addToPage(id); }}>+</button>
+              <button aria-label="Add to page" title="Add to page" onClick={(e) => { e.stopPropagation(); addToPage(id); }}>+</button>
+              <button className="bgb" aria-label="Use as background" title="Use as background" onClick={(e) => { e.stopPropagation(); setAsBackground(id); }}>▣</button>
             </div>
           ))}
         </div>
@@ -30,7 +31,7 @@ export default function PhotosPanel() {
         <div className="empty">Photos you upload appear here. You can also drop files or paste an image straight onto the page.</div>
       )}
       <p className="hint" style={{ marginTop: 10 }}>
-        Drag a photo onto a frame to fill it, onto a calendar day to put it in that box, or anywhere else to add it as a picture. On a phone, tap a photo, then tap where it goes.
+        Drag a photo onto a frame to fill it, onto a calendar day to put it in that box, or anywhere else to add it as a picture. Press ▣ to use it as the page's background image. On a phone, tap a photo, then tap where it goes.
       </p>
     </section>
   );

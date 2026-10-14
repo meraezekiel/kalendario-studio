@@ -1,6 +1,6 @@
 import { SHAPES } from '@/lib/calendar/constants';
 import { mkShape } from '@/lib/calendar/factories';
-import { addPreset, addShape } from '@/store/actions';
+import { addBackground, addPreset, addShape } from '@/store/actions';
 
 /** Small fixed-size shapes used as button icons. */
 const MINI = SHAPES.map(([kind, label]) => ({
@@ -10,5 +10,5 @@ const MINI = SHAPES.map(([kind, label]) => ({
 }));
 
 export function useAddPanelHandler() {
-  return { shapes: MINI, addPreset, addShape };
+  return { shapes: MINI, addPreset, addShape, addBackground };
 }

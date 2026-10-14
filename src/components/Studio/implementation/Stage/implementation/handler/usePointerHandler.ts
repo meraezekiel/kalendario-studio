@@ -1,5 +1,6 @@
 import { type PointerEvent as RPointerEvent, type RefObject, useRef } from 'react';
 import { ASPECT_SHAPES } from '@/lib/calendar/constants';
+import { findGraphic } from '@/lib/graphics/library';
 import { dims } from '@/lib/calendar/document';
 import { assetFor, imageScale } from '@/lib/calendar/render';
 import type { CalendarDoc, El } from '@/lib/calendar/types';
@@ -216,7 +217,7 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
       const hx = d.h.includes('e') ? 1 : d.h.includes('w') ? -1 : 0, hy = d.h.includes('s') ? 1 : d.h.includes('n') ? -1 : 0;
       let nw = Math.max(12, d.w0 + hx * lx), nh = Math.max(6, d.h0 + hy * ly);
       const corner = !!(hx && hy);
-      const keep = corner && (e.shiftKey || el.type === 'image' || el.type === 'text' || (el.type === 'shape' && ASPECT_SHAPES.includes(el.shape)));
+      const keep = corner && (e.shiftKey || el.type === 'image' || el.type === 'text' || (el.type === 'shape' && ASPECT_SHAPES.includes(el.shape)) || (el.type === 'graphic' && !findGraphic(el.key)?.stretch));
       if (keep) { const k = Math.max(nw / d.w0, nh / d.h0); nw = Math.max(12, d.w0 * k); nh = Math.max(6, d.h0 * k); }
       const dw = nw - d.w0, dh = nh - d.h0, clx = (hx * dw) / 2, cly = (hy * dh) / 2;
       const cx = d.x0 + d.w0 / 2 + clx * cos - cly * sin, cy = d.y0 + d.h0 / 2 + clx * sin + cly * cos;

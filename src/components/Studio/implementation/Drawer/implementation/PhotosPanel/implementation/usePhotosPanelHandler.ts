@@ -17,6 +17,7 @@ export function usePhotosPanelHandler() {
     /** Tap a photo to arm it, then tap the page to place it (works on touch screens). */
     toggleArm: (i: number) => useStudioStore.getState().set({ armed: armed === i ? null : i }),
     addToPage: (id: string) => placeAsset(id, null),
+    setAsBackground: (id: string) => placeAsset(id, { bg: true }),
     remove: removeTrayItem,
     onDragStart: (e: DragEvent, id: string) => {
       e.dataTransfer.setData(ASSET_MIME, id);

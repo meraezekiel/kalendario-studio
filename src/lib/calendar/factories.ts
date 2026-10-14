@@ -1,4 +1,4 @@
-import type { CalEl, El, EventsEl, ImageEl, Orientation, Page, PageRole, PaperKey, ShapeEl, TextEl } from './types';
+import type { CalEl, El, EventsEl, GraphicEl, ImageEl, Orientation, Page, PageRole, PaperKey, ShapeEl, TextEl } from './types';
 import { uid } from './utils';
 
 type Init<T> = Partial<Omit<T, 'type'>>;
@@ -33,6 +33,10 @@ export const mkCal = (o: Init<CalEl> = {}): CalEl => ({
 export const mkEvents = (o: Init<EventsEl> = {}): EventsEl => ({
   ...base(), type: 'events', mo: 0, w: 210, h: 240, font: 'Poppins', size: 12, color: '#333333', hiColor: '#e0262b',
   title: true, titleFont: 'Anton', titleColor: '#1b3a8f', cols: 1, ...o,
+});
+
+export const mkGraphic = (o: Init<GraphicEl> = {}): GraphicEl => ({
+  ...base(), type: 'graphic', w: 160, h: 160, key: 'fluent/party-popper', flipX: false, flipY: false, ...o,
 });
 
 export const mkPage = (size: PaperKey, o: Orientation, bg: string, els: El[], role: PageRole = 'main'): Page => ({

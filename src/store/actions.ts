@@ -1,8 +1,11 @@
 'use client';
 
 import { MONTHS } from '@/lib/calendar/constants';
-import { assetInUse, clonePage, dims, makeYear, syncDesign } from '@/lib/calendar/document';
-import { mkCal, mkEvents, mkImage, mkPage, mkShape, mkText } from '@/lib/calendar/factories';
+import { assetInUse, clonePage, dims, ensureBackground, makeYear, mkBackground, syncDesign } from '@/lib/calendar/document';
+import { mkCal, mkEvents, mkGraphic, mkImage, mkPage, mkShape, mkText } from '@/lib/calendar/factories';
+import { DECOS } from '@/lib/graphics/deco';
+import { findGraphic } from '@/lib/graphics/library';
+import { rememberGraphic } from '@/lib/graphics/recent';
 import { readImage } from '@/lib/calendar/samplePhoto';
 import { giveCal, TEMPLATES } from '@/lib/calendar/templates';
 import type { CalEl, El, Page, ShapeEl, ShapeKind } from '@/lib/calendar/types';
@@ -50,6 +53,15 @@ export function addPreset(w: PresetKey) {
     e.mo = 11;
     toast('That would go past December, so this calendar shows December.');
   }
+  // A new month table goes under the lowest one instead of on top of it (e.g. two months per page).
+  if (e.type === 'cal' && cals.length) {
+    const last = cals.reduce((a, b) => (b.y + b.h > a.y + a.h ? b : a));
+    const H = dims(curPage(S().doc)).H, y = last.y + last.h + 16, room = H - y - 16;
+    if (room >= 160) {
+      Object.assign(e, { x: last.x, y, w: last.w, h: Math.min(last.h, room) });
+      return addEl(e, false);
+    }
+  }
   addEl(e);
 }
 
@@ -67,6 +79,39 @@ export function addShape(s: ShapeKind) {
   if (s === 'wave') return addEl({ ...e, x: 0, y: H - 150 }, false);
   if (s === 'holes') return addEl({ ...e, x: 44, y: 12 }, false);
   addEl(e);
+}
+
+/** Adds a full-page background image behind everything, selects it and asks for a photo. */
+export function addBackground() {
+  const b = mkBackground(curPage(S().doc));
+  S().mutate((d) => void curPage(d).els.unshift(b));
+  S().set({ cropId: null });
+  S().select(b.id);
+  pickFiles({ img: b.id }, false);
+}
+
+/** Resizes a background image to cover the whole page again. */
+export function fitToPage(id: string) {
+  S().mutate((d) => {
+    const el = findEl(d, id);
+    if (!el) return;
+    const D = dims(curPage(d));
+    Object.assign(el, { x: 0, y: 0, w: D.W, h: D.H, rot: 0 });
+  });
+}
+
+/** Adds a graphic from the library, centred or at `pt` (page coordinates), and selects it. */
+export function addGraphic(key: string, pt?: { x: number; y: number }) {
+  const g = findGraphic(key);
+  if (!g) return;
+  const D = dims(curPage(S().doc));
+  const [w, h] = g.deco ? DECOS[g.deco.kind].size : g.stretch ? [360, 240] : key.startsWith('peeps/') ? [170, 204] : [160, 160];
+  const e = g.deco
+    ? mkGraphic({ key: `deco/${g.deco.kind}`, palette: g.deco.palette, seed: Math.floor(Math.random() * 1e9), amount: 1, w, h })
+    : mkGraphic({ key, w, h });
+  rememberGraphic(key);
+  if (!pt) return addEl(e);
+  addEl({ ...e, x: Math.round(clamp(pt.x - w / 2, 0, D.W - w)), y: Math.round(clamp(pt.y - h / 2, 0, D.H - h)) }, false);
 }
 
 /* ---------- photos ---------- */
@@ -101,7 +146,11 @@ export function placeAsset(id: string, target: PickTarget, pt?: { x: number; y: 
   let selId: string | null = null, selDay: number | null = null;
   s.mutate((d) => {
     const pg = curPage(d);
-    if (target && 'cal' in target) {
+    if (target && 'bg' in target) {
+      const b = ensureBackground(pg);
+      Object.assign(b, { src: id, zoom: 1, px: 50, py: 50 });
+      selId = b.id;
+    } else if (target && 'cal' in target) {
       const c = pg.els.find((e) => e.id === target.cal);
       if (c?.type === 'cal') (c.days[target.day] = c.days[target.day] || {}).img = id;
       selId = target.cal;
@@ -120,6 +169,7 @@ export function placeAsset(id: string, target: PickTarget, pt?: { x: number; y: 
   });
   s.set({ armed: null });
   s.select(selId, selDay);
+  if (target && 'bg' in target) toast('Background set. Drag its corners to change how wide and tall it is.');
 }
 
 /** Opens the system file picker. With a target the first picked photo goes straight there. */
@@ -138,6 +188,34 @@ export function pickFiles(target: PickTarget | 'tray', multiple = true) {
       toast(`${ids.length} photo${ids.length > 1 ? 's' : ''} added. Drag onto the page, a frame, or a day.`);
       S().set({ tab: 'photos' });
     }
+  });
+  document.body.appendChild(inp);
+  inp.click();
+}
+
+/**
+ * Picks several images and makes them the backgrounds of this page and the ones after it,
+ * in file-name order (01-jan.png, 02-feb.png, …).
+ */
+export function pickMonthBackgrounds() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.multiple = true;
+  inp.style.display = 'none';
+  inp.addEventListener('change', async () => {
+    const files = [...(inp.files || [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    inp.remove();
+    const ids = await addFiles(files);
+    if (!ids.length) return;
+    const s = S();
+    const from = s.doc.cur;
+    const n = Math.min(ids.length, s.doc.pages.length - from);
+    s.mutate((d) => {
+      for (let i = 0; i < n; i++) Object.assign(ensureBackground(d.pages[from + i]), { src: ids[i], zoom: 1, px: 50, py: 50 });
+    });
+    const extra = ids.length - n;
+    toast(`Backgrounds added to page${n > 1 ? 's' : ''} ${from + 1}${n > 1 ? `–${from + n}` : ''}.${extra > 0 ? ` ${extra} more ${extra > 1 ? 'are' : 'is'} in your Photos.` : ''}`);
   });
   document.body.appendChild(inp);
   inp.click();

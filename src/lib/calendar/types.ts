@@ -45,6 +45,8 @@ export interface ImageEl extends BaseEl {
   bw: number;
   bc: string;
   shadow: boolean;
+  /** A background image: added behind everything, and matched to other months' backgrounds by Apply design. */
+  isBg?: boolean;
 }
 
 export type ShapeKind =
@@ -119,7 +121,20 @@ export interface EventsEl extends BaseEl {
   cols: number;
 }
 
-export type El = TextEl | ImageEl | ShapeEl | CalEl | EventsEl;
+/** A ready-made illustration or gradient from the Graphics library. */
+export interface GraphicEl extends BaseEl {
+  type: 'graphic';
+  /** Library key, e.g. `fluent/party-popper` or `gradient/sunset`. */
+  key: string;
+  flipX: boolean;
+  flipY: boolean;
+  /** Decorations (`deco/…` keys) only: colour palette id, scatter seed and density. */
+  palette?: string;
+  seed?: number;
+  amount?: number;
+}
+
+export type El = TextEl | ImageEl | ShapeEl | CalEl | EventsEl | GraphicEl;
 export type ElType = El['type'];
 
 export interface Page {

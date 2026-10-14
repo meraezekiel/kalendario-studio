@@ -7,11 +7,11 @@ import { makeYear } from '@/lib/calendar/document';
 import { TEMPLATES } from '@/lib/calendar/templates';
 import type { CalendarDoc, El, Page } from '@/lib/calendar/types';
 
-export type DrawerTab = 'templates' | 'add' | 'photos' | 'page';
+export type DrawerTab = 'templates' | 'add' | 'graphics' | 'photos' | 'page';
 export interface Guide { v?: number; h?: number }
 export interface Editing { id: string; day?: number }
 export interface Rect { x: number; y: number; w: number; h: number }
-export type PickTarget = { cal: string; day: number } | { img: string } | null;
+export type PickTarget = { cal: string; day: number } | { img: string } | { bg: true } | null;
 
 const HISTORY_LIMIT = 80;
 const MERGE_MS = 1200;

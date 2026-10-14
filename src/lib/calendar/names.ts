@@ -1,8 +1,9 @@
 import { MONTHS, SHAPES } from './constants';
+import { findGraphic } from '../graphics/library';
 import { monthOf } from './document';
 import type { El, ElType, Page } from './types';
 
-export const TYPE_LABEL: Record<ElType, string> = { text: 'Text', image: 'Img', shape: 'Shape', cal: 'Cal', events: 'List' };
+export const TYPE_LABEL: Record<ElType, string> = { text: 'Text', image: 'Img', shape: 'Shape', cal: 'Cal', events: 'List', graphic: 'Art' };
 
 /** Human name for an element in the layers list and inspector title. */
 export function elName(e: El, year: number, pg: Page): string {
@@ -12,6 +13,7 @@ export function elName(e: El, year: number, pg: Page): string {
     case 'image': return 'Photo';
     case 'shape': return (SHAPES.find((s) => s[0] === e.shape) || ['', 'Shape'])[1];
     case 'cal': return `Calendar · ${MONTHS[monthOf(year, pg, e.mo).m]}`;
+    case 'graphic': return findGraphic(e.key)?.label ?? 'Graphic';
     default: return 'Holiday list';
   }
 }

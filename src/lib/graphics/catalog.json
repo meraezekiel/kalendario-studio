@@ -1,0 +1,108 @@
+{
+  "categories": [
+    {
+      "id": "celebrate",
+      "label": "Celebrations",
+      "items": ["party-popper", "confetti-ball", "balloon", "wrapped-gift", "birthday-cake", "cupcake", "fireworks", "sparkler", "sparkles", "glowing-star", "star", "shooting-star", "ribbon", "rosette", "trophy", "crown", "red-paper-lantern", "christmas-tree", "santa-claus", "mrs-claus", "snowman", "bell", "candle", "jack-o-lantern", "ghost", "wedding", "ring", "love-letter", "tanabata-tree", "carp-streamer", "partying-face"]
+    },
+    {
+      "id": "hearts",
+      "label": "Hearts",
+      "items": ["red-heart", "pink-heart", "orange-heart", "yellow-heart", "green-heart", "blue-heart", "purple-heart", "sparkling-heart", "two-hearts", "revolving-hearts", "heart-with-ribbon", "heart-with-arrow", "growing-heart", "heart-decoration"]
+    },
+    {
+      "id": "nature",
+      "label": "Nature & weather",
+      "items": ["sun-with-face", "sun", "sun-behind-cloud", "cloud", "cloud-with-rain", "umbrella-with-rain-drops", "rainbow", "snowflake", "crescent-moon", "full-moon-face", "night-with-stars", "sunrise", "water-wave", "volcano", "desert-island", "beach-with-umbrella", "palm-tree", "deciduous-tree", "evergreen-tree", "cactus", "seedling", "herb", "four-leaf-clover", "maple-leaf", "fallen-leaf", "leaf-fluttering-in-wind"]
+    },
+    {
+      "id": "flowers",
+      "label": "Flowers",
+      "items": ["hibiscus", "cherry-blossom", "blossom", "rose", "tulip", "sunflower", "white-flower", "bouquet", "sheaf-of-rice", "mushroom"]
+    },
+    {
+      "id": "animals",
+      "label": "Animals",
+      "items": ["cat-face", "dog-face", "rabbit-face", "pig-face", "cow-face", "water-buffalo", "rooster", "chicken", "baby-chick", "hatching-chick", "bird", "dove", "butterfly", "honeybee", "lady-beetle", "lizard", "turtle", "frog", "tropical-fish", "dolphin", "spouting-whale", "crab", "spiral-shell", "unicorn", "teddy-bear"]
+    },
+    {
+      "id": "food",
+      "label": "Food & fruit",
+      "items": ["mango", "banana", "pineapple", "coconut", "watermelon", "strawberry", "grapes", "red-apple", "peach", "lemon", "cooked-rice", "rice-ball", "steaming-bowl", "pizza", "hot-dog", "ice-cream", "soft-ice-cream", "shortcake", "cookie", "lollipop", "candy", "bubble-tea", "teacup-without-handle", "moon-cake"]
+    },
+    {
+      "id": "school",
+      "label": "School, work & travel",
+      "items": ["books", "open-book", "notebook", "pencil", "graduation-cap", "backpack", "school", "spiral-calendar", "tear-off-calendar", "alarm-clock", "envelope", "money-bag", "coin", "camera", "musical-notes", "guitar", "light-bulb", "house", "church", "bus", "airplane", "ship", "bicycle", "kite"]
+    },
+    {
+      "id": "people",
+      "label": "Faces & people",
+      "items": ["smiling-face-with-smiling-eyes", "grinning-face", "smiling-face-with-heart-eyes", "star-struck", "smiling-face-with-sunglasses", "winking-face", "smiling-face-with-halo", "face-savoring-food", "baby", "boy", "girl", "man", "woman", "old-man", "old-woman", "people-hugging", "teacher", "thumbs-up", "clapping-hands", "heart-hands", "folded-hands"]
+    },
+    {
+      "id": "badges",
+      "label": "Badges & symbols",
+      "items": ["check-mark-button", "check-mark", "cross-mark", "hundred-points", "fire", "round-pushpin", "pushpin", "triangular-flag", "chequered-flag", "bookmark", "speech-balloon", "thought-balloon", "red-exclamation-mark", "red-question-mark", "sparkle", "collision"]
+    }
+  ],
+  "tags": {
+    "party-popper": "celebration new year bagong taon",
+    "confetti-ball": "celebration party",
+    "fireworks": "new year bagong taon celebration",
+    "sparkler": "new year",
+    "wrapped-gift": "present birthday christmas pasko",
+    "birthday-cake": "kaarawan party",
+    "christmas-tree": "pasko december holiday",
+    "santa-claus": "pasko christmas",
+    "red-paper-lantern": "parol lantern christmas pasko chinese new year",
+    "bell": "christmas pasko",
+    "jack-o-lantern": "halloween undas pumpkin",
+    "ghost": "halloween undas",
+    "candle": "undas all saints",
+    "wedding": "kasal",
+    "red-heart": "love valentine",
+    "pink-heart": "love valentine",
+    "sparkling-heart": "love valentine",
+    "two-hearts": "love valentine",
+    "heart-with-arrow": "valentine cupid",
+    "sun-with-face": "summer tag-init",
+    "sun": "summer tag-init",
+    "cloud-with-rain": "rainy season tag-ulan",
+    "umbrella-with-rain-drops": "rainy season tag-ulan",
+    "beach-with-umbrella": "summer vacation",
+    "desert-island": "summer beach",
+    "water-buffalo": "carabao kalabaw farm",
+    "rooster": "manok",
+    "mango": "mangga fruit summer",
+    "cooked-rice": "kanin",
+    "sheaf-of-rice": "palay harvest",
+    "hibiscus": "gumamela",
+    "graduation-cap": "graduation school",
+    "books": "school back to school",
+    "backpack": "school back to school",
+    "teacher": "school"
+  },
+  "illustrated": [
+    {
+      "id": "pack-animals",
+      "label": "Cute animals",
+      "items": ["tiger-face", "elephant", "leopard", "tiger", "giraffe", "zebra", "lion", "monkey-face", "panda", "fox", "koala", "sloth", "owl", "penguin", "parrot", "flamingo", "peacock", "hedgehog", "otter", "llama", "hippopotamus", "camel", "deer", "water-buffalo"]
+    },
+    {
+      "id": "pack-food",
+      "label": "Bright food",
+      "items": ["hamburger", "french-fries", "pizza", "taco", "burrito", "sushi", "shrimp", "cooked-rice", "spaghetti", "doughnut", "birthday-cake", "ice-cream", "croissant", "bacon", "poultry-leg", "broccoli", "hot-pepper", "popcorn", "bento-box", "avocado", "watermelon", "pineapple", "mango", "shortcake"]
+    },
+    {
+      "id": "pack-travel",
+      "label": "Travel accessories",
+      "items": ["luggage", "camera", "camera-with-flash", "sunglasses", "airplane", "ticket", "billed-cap", "womans-hat", "goggles", "mobile-phone", "headphone", "world-map", "compass", "beach-with-umbrella", "passport-control", "backpack"]
+    },
+    {
+      "id": "pack-camping",
+      "label": "Camping & outdoors",
+      "items": ["tent", "fire", "camping", "national-park", "mountain", "snow-capped-mountain", "sunrise-over-mountains", "flashlight", "hiking-boot", "canoe", "axe", "fishing-pole", "evergreen-tree", "crescent-moon", "fallen-leaf", "mushroom", "night-with-stars", "milky-way"]
+    }
+  ]
+}

@@ -312,6 +312,354 @@ test.describe('Kalendaryo Studio', () => {
     await expect(f.getByRole('button', { name: 'Print page' })).toHaveCount(0);
   });
 
+  test('background image tool: add, upload, drag to size, stays behind, prints', async ({ page }) => {
+    const errors = await openStudio(page);
+    await chooseTemplate(page, 'Giveaway · 3 months');
+    const bg = page.locator('.ph .page > .el[data-bg]');
+    await expect(bg).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Background image' }).click();
+    await (await chooser).setFiles({ name: 'bg.png', mimeType: 'image/png', buffer: await makePng(page, '#f4d58d', 600, 900) });
+    await expect(bg.locator('.im')).toBeVisible();
+    await expect(inspectorTitle(page)).toHaveText('Background');
+    // Added behind everything: first on the page, last in Layers, full page size.
+    await expect(page.locator('.ph .page > .el').first()).toHaveAttribute('data-bg', '');
+    await expect(page.getByTestId('layers').locator('.layer').last()).toContainText('Background');
+    const pg = (await page.locator('.ph .page').boundingBox())!;
+    const b0 = (await bg.boundingBox())!;
+    expect(Math.abs(b0.width - pg.width)).toBeLessThan(2);
+    expect(Math.abs(b0.height - pg.height)).toBeLessThan(2);
+
+    // Drag the bottom-right corner in to make it smaller.
+    const se = (await page.locator('.hd.se').boundingBox())!;
+    await page.mouse.move(se.x + se.width / 2, se.y + se.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(se.x - 150, se.y - 220, { steps: 8 });
+    await page.mouse.up();
+    const b1 = (await bg.boundingBox())!;
+    expect(b1.width).toBeLessThan(b0.width - 60);
+    expect(b1.height).toBeLessThan(b0.height - 60);
+    // Drag the right edge to make it wider without changing the height.
+    const e = (await page.locator('.hd.e').boundingBox())!;
+    await page.mouse.move(e.x + e.width / 2, e.y + e.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(e.x + 70, e.y + e.height / 2, { steps: 6 });
+    await page.mouse.up();
+    const b2 = (await bg.boundingBox())!;
+    expect(b2.width).toBeGreaterThan(b1.width + 40);
+    expect(Math.abs(b2.height - b1.height)).toBeLessThan(2);
+    await page.screenshot({ path: 'e2e/shots/12-background.png' });
+
+    // Calendars stay on top of it.
+    const cal = (await page.locator('.ph .el-cal').first().boundingBox())!;
+    const onTop = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.el')?.classList.contains('el-cal'), [cal.x + 40, cal.y + 80]);
+    expect(onTop).toBe(true);
+
+    // Fit to page puts it back to full size; one undo per step.
+    await page.locator('.insp').getByRole('button', { name: 'Fit to page' }).click();
+    await expect.poll(async () => Math.round((await bg.boundingBox())!.width)).toBe(Math.round(pg.width));
+    await page.keyboard.press('Control+z');
+    await expect.poll(async () => Math.round((await bg.boundingBox())!.width)).toBe(Math.round(b2.width));
+
+    // It prints with the page.
+    await page.evaluate(() => {
+      window.print = () => {
+        (window as unknown as { __bg: number }).__bg = document.querySelectorAll('#printArea .el[data-bg] .im').length;
+      };
+    });
+    await page.getByRole('button', { name: 'Print page' }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __bg?: number }).__bg)).toBe(1);
+    expect(errors).toEqual([]);
+  });
+
+  test('tray ▣ and backgrounds for each month fill the background image, kept by Apply design', async ({ page }) => {
+    const errors = await openStudio(page);
+    const bg = page.locator('.ph .page > .el[data-bg]');
+    // Width of the current page's background photo (each test image has its own width).
+    const bgWidth = () =>
+      bg.locator('.im').evaluate((n) => {
+        const url = getComputedStyle(n).backgroundImage.slice(5, -2);
+        return new Promise<number>((res) => { const im = new Image(); im.onload = () => res(im.naturalWidth); im.src = url; });
+      });
+
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Backgrounds for each month' }).click();
+    await (await chooser).setFiles([
+      { name: '03-mar.png', mimeType: 'image/png', buffer: await makePng(page, '#2a9d8f', 103, 140) },
+      { name: '01-jan.png', mimeType: 'image/png', buffer: await makePng(page, '#e76f51', 101, 140) },
+      { name: '02-feb.png', mimeType: 'image/png', buffer: await makePng(page, '#e9c46a', 102, 140) },
+    ]);
+    await expect(page.locator('.toast')).toContainText('pages 1–3');
+    expect(await bgWidth()).toBe(101);
+    await page.getByRole('button', { name: 'Next page' }).click();
+    expect(await bgWidth()).toBe(102);
+    await page.getByRole('button', { name: 'Next page' }).click();
+    expect(await bgWidth()).toBe(103);
+    await page.getByRole('button', { name: 'Next page' }).click();
+    await expect(bg).toHaveCount(0);
+
+    // The tray's ▣ button fills (or creates) this page's background.
+    await page.getByRole('button', { name: 'Photos', exact: true }).click();
+    await page.getByTestId('tray').locator('.t').first().getByRole('button', { name: 'Use as background' }).click();
+    await expect(bg).toHaveCount(1);
+    await expect(inspectorTitle(page)).toHaveText('Background');
+
+    // Apply design from January: Feb and Mar keep their own backgrounds.
+    await page.getByTestId('pagebar').getByRole('button', { name: /^1 ·/ }).click();
+    await page.getByRole('button', { name: 'Apply design to all months' }).click();
+    await page.getByRole('button', { name: 'Click again to confirm' }).click();
+    await page.getByTestId('pagebar').getByRole('button', { name: /^2 ·/ }).click();
+    expect(await bgWidth()).toBe(102);
+    await expect(page.locator('.ph .page > .el-image')).toHaveCount(2); // background + main photo, not mixed up
+    await page.getByTestId('pagebar').getByRole('button', { name: /^3 ·/ }).click();
+    expect(await bgWidth()).toBe(103);
+    expect(errors).toEqual([]);
+  });
+  test('two months per page: second table shows the next month, fill year makes six pages', async ({ page }) => {
+    const errors = await openStudio(page);
+    await chooseTemplate(page, 'Blank page');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await page.getByRole('button', { name: 'Table with header bar' }).click();
+    await page.getByRole('button', { name: 'Table with header bar' }).click();
+    const heads = page.locator('.ph .el-cal .chead');
+    await expect(heads).toHaveCount(2);
+    await expect(heads.nth(0)).toContainText('JANUARY');
+    await expect(heads.nth(1)).toContainText('FEBRUARY');
+
+    // The second table lands under the first, same width and left edge, without overlapping.
+    const [a, b] = [(await page.locator('.ph .el-cal').nth(0).boundingBox())!, (await page.locator('.ph .el-cal').nth(1).boundingBox())!];
+    expect(b.y).toBeGreaterThan(a.y + a.height);
+    expect(Math.round(b.x)).toBe(Math.round(a.x));
+    expect(Math.round(b.width)).toBe(Math.round(a.width));
+    expect(Math.round(b.height)).toBe(Math.round(a.height));
+
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    await page.getByRole('button', { name: 'Fill the rest of the year from this design' }).click();
+    await page.getByRole('button', { name: 'Click again to confirm' }).click();
+    await expect(page.getByTestId('page-label')).toHaveText(/Page 1 of 6 · January/);
+    await page.getByTestId('pagebar').getByRole('button', { name: /^2 ·/ }).click();
+    await expect(heads.nth(0)).toContainText('MARCH');
+    await expect(heads.nth(1)).toContainText('APRIL');
+    await page.getByTestId('pagebar').getByRole('button', { name: /^6 ·/ }).click();
+    await expect(heads.nth(0)).toContainText('NOVEMBER');
+    await expect(heads.nth(1)).toContainText('DECEMBER');
+    await page.screenshot({ path: 'e2e/shots/13-two-months.png' });
+    expect(errors).toEqual([]);
+  });
+
+  test('graphics library: browse, search, add, drag, resize, flip, print and export', async ({ page }) => {
+    const errors = await openStudio(page);
+    await chooseTemplate(page, 'Blank page');
+    await page.getByRole('button', { name: 'Graphics', exact: true }).click();
+    const panel = page.locator('.drawer');
+    const art = page.locator('.ph .el-graphic');
+
+    // Thumbnails load.
+    const tile = panel.getByRole('button', { name: 'Party popper' });
+    await expect(tile).toBeVisible();
+    await expect.poll(() => tile.locator('img').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+
+    // Click to add; it is selected and named.
+    await tile.click();
+    await expect(art).toHaveCount(1);
+    await expect(inspectorTitle(page)).toHaveText('Party popper');
+    await expect.poll(() => art.locator('img').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+    await expect(page.getByTestId('graphic-recent').getByRole('button', { name: 'Party popper' })).toBeVisible();
+
+    // Corner resize keeps an illustration's shape.
+    const se = (await page.locator('.hd.se').boundingBox())!;
+    await page.mouse.move(se.x + se.width / 2, se.y + se.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(se.x + 90, se.y + 20, { steps: 6 });
+    await page.mouse.up();
+    const b = (await art.boundingBox())!;
+    expect(Math.abs(b.width - b.height)).toBeLessThan(2);
+    expect(b.width).toBeGreaterThan(120);
+
+    // Flip.
+    await page.getByRole('button', { name: 'Flip ↔' }).click();
+    await expect(art.locator('img')).toHaveCSS('transform', 'matrix(-1, 0, 0, 1, 0, 0)');
+
+    // Search, including Filipino words.
+    await panel.getByLabel('Search graphics').fill('pasko');
+    await expect(page.getByTestId('graphic-results').getByRole('button', { name: 'Christmas tree' })).toBeVisible();
+    await panel.getByLabel('Search graphics').fill('carabao');
+    await expect(page.getByTestId('graphic-results').getByRole('button')).toHaveCount(1);
+    await panel.getByLabel('Search graphics').fill('');
+
+    // See all shows a whole category.
+    await page.getByTestId('graphic-cat-animals').getByRole('button', { name: 'See all' }).click();
+    await expect(page.getByTestId('graphic-cat-animals').locator('.gtile')).toHaveCount(25);
+    await panel.getByRole('button', { name: '← All graphics' }).click();
+
+    // Drag a gradient onto the page; gradients stretch freely from the side handle.
+    const pg = (await page.locator('.ph .page').boundingBox())!;
+    await panel.getByRole('button', { name: 'Sunset' }).dragTo(page.locator('.ph .page'), { targetPosition: { x: pg.width / 2, y: pg.height * 0.75 } });
+    await expect(art).toHaveCount(2);
+    await expect(inspectorTitle(page)).toHaveText('Sunset');
+    const g0 = (await art.nth(1).boundingBox())!;
+    expect(g0.y + g0.height / 2).toBeGreaterThan(pg.y + pg.height * 0.6);
+    const e = (await page.locator('.hd.e').boundingBox())!;
+    await page.mouse.move(e.x + e.width / 2, e.y + e.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(e.x + 80, e.y + e.height / 2, { steps: 6 });
+    await page.mouse.up();
+    const g1 = (await art.nth(1).boundingBox())!;
+    expect(g1.width).toBeGreaterThan(g0.width + 40);
+    expect(Math.abs(g1.height - g0.height)).toBeLessThan(2);
+    await page.screenshot({ path: 'e2e/shots/14-graphics.png' });
+
+    // Prints and exports.
+    await page.evaluate(() => {
+      window.print = () => {
+        (window as unknown as { __g: number }).__g = document.querySelectorAll('#printArea .el-graphic img').length;
+      };
+    });
+    await page.getByRole('button', { name: 'Print page' }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __g?: number }).__g)).toBe(2);
+    const dl = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'PNG' }).click();
+    const file = await dl;
+    const fs = await import('node:fs');
+    fs.copyFileSync((await file.path())!, 'e2e/shots/15-graphics-export.png');
+    expect(errors).toEqual([]);
+  });
+
+  test('decorations: bunting and confetti re-draw on resize, recolour, shuffle, search', async ({ page }) => {
+    const errors = await openStudio(page);
+    await chooseTemplate(page, 'Blank page');
+    await page.getByRole('button', { name: 'Graphics', exact: true }).click();
+    const panel = page.locator('.drawer');
+    await expect(page.getByTestId('graphic-cat-bunting')).toBeVisible();
+    await page.locator('.drawer').screenshot({ path: 'e2e/shots/16-decorations-panel.png' });
+
+    // Search finds them, including the Filipino word for bunting.
+    await panel.getByLabel('Search graphics').fill('banderitas');
+    await expect(page.getByTestId('graphic-results').locator('.gtile')).toHaveCount(8);
+    await panel.getByLabel('Search graphics').fill('');
+
+    const src = (loc: ReturnType<typeof page.locator>) => loc.locator('img').getAttribute('src');
+    await panel.getByRole('button', { name: 'Triangle bunting (Rainbow)', exact: true }).click();
+    const bunting = page.locator('.ph .el-graphic').last();
+    await expect(inspectorTitle(page)).toHaveText('Triangle bunting');
+    await expect.poll(() => bunting.locator('img').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+    const s0 = await src(bunting);
+
+    // Wider: re-drawn (more flags), not stretched.
+    const e = (await page.locator('.hd.e').boundingBox())!;
+    await page.mouse.move(e.x + e.width / 2, e.y + e.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(e.x + 100, e.y + e.height / 2, { steps: 5 });
+    await page.mouse.up();
+    const s1 = await src(bunting);
+    expect(s1).not.toBe(s0);
+    const flagCount = (s: string | null) => (decodeURIComponent(s ?? '').match(/<path d="M[^"]*Z"/g) ?? []).length;
+    expect(flagCount(s1)).toBeGreaterThan(flagCount(s0));
+
+    // Recolour.
+    await page.getByRole('button', { name: 'Christmas', exact: true }).click();
+    expect(decodeURIComponent((await src(bunting)) ?? '')).toContain('#c8102e');
+
+    // Confetti: shuffle and amount.
+    await panel.getByRole('button', { name: 'Confetti (Rainbow)', exact: true }).click();
+    const confetti = page.locator('.ph .el-graphic').last();
+    const c0 = await src(confetti);
+    await page.getByRole('button', { name: 'Shuffle' }).click();
+    const c1 = await src(confetti);
+    expect(c1).not.toBe(c0);
+    await page.locator('.insp').getByLabel('Amount').fill('2');
+    await expect.poll(async () => decodeURIComponent((await src(confetti)) ?? '').length).toBeGreaterThan(decodeURIComponent(c1 ?? '').length * 1.4);
+
+    // A small composition for the screenshot.
+    await panel.getByRole('button', { name: 'Balloons (Pastel)', exact: true }).click();
+    await panel.getByRole('button', { name: 'Scalloped frame (Pastel)', exact: true }).click();
+    await panel.getByRole('button', { name: 'Leafy vine (Leaf)', exact: true }).click();
+    await expect(page.locator('.ph .el-graphic')).toHaveCount(5);
+    await page.screenshot({ path: 'e2e/shots/17-decorations.png' });
+
+    const dl = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'PNG' }).click();
+    const fs = await import('node:fs');
+    fs.copyFileSync((await (await dl).path())!, 'e2e/shots/18-decorations-export.png');
+    expect(errors).toEqual([]);
+  });
+
+  test('illustration packs: open a pack, add rainbow, leaf, person and zodiac; recolour; search', async ({ page }) => {
+    const errors = await openStudio(page);
+    await chooseTemplate(page, 'Blank page');
+    await page.getByRole('button', { name: 'Graphics', exact: true }).click();
+    const panel = page.locator('.drawer');
+    const art = page.locator('.ph .el-graphic');
+
+    // All 21 pack cards, each with previews that load.
+    const cards = panel.locator('.pack');
+    await expect(cards).toHaveCount(21);
+    for (const [id, n] of [['pack-animals', 24], ['pack-food', 24], ['pack-travel', 16], ['pack-camping', 18], ['pack-girl-power', 12], ['pack-pastel-ladies', 12], ['pack-duo', 12], ['pack-badges', 24], ['pack-fruits', 22], ['pack-love', 20]] as const)
+      await expect(page.getByTestId(`pack-${id}`)).toContainText(`${n} graphics`);
+    await expect(page.getByTestId('pack-pack-rainbows')).toContainText('Organic rainbows');
+    await expect(page.getByTestId('pack-pack-people')).toContainText('24 graphics');
+    await expect.poll(() => page.getByTestId('pack-pack-people').locator('img').first().evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+    await panel.screenshot({ path: 'e2e/shots/19-packs.png' });
+
+    // Open a pack, add a rainbow and recolour it.
+    await page.getByTestId('pack-pack-rainbows').click();
+    await expect(page.getByTestId('graphic-cat-pack-rainbows').locator('.gtile')).toHaveCount(14);
+    await panel.getByRole('button', { name: 'Rainbow with clouds (Boho)', exact: true }).click();
+    await expect(inspectorTitle(page)).toHaveText('Rainbow with clouds');
+    await page.getByRole('button', { name: 'Sage', exact: true }).click();
+    expect(decodeURIComponent((await art.last().locator('img').getAttribute('src')) ?? '')).toContain('#7f9172');
+    await panel.getByRole('button', { name: '← All graphics' }).click();
+
+    // Leaves, people and zodiac.
+    await page.getByTestId('pack-pack-leaves').click();
+    await panel.getByRole('button', { name: 'Monstera leaf (Leaf)', exact: true }).click();
+    await panel.getByRole('button', { name: '← All graphics' }).click();
+    await page.getByTestId('pack-pack-people').click();
+    await panel.getByRole('button', { name: 'Teacher with glasses', exact: true }).click();
+    await expect(inspectorTitle(page)).toHaveText('Teacher with glasses');
+    await expect.poll(() => art.last().locator('img').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+    await panel.getByRole('button', { name: '← All graphics' }).click();
+
+    // Illustrated, people and badge packs add like any graphic.
+    await page.getByTestId('pack-pack-animals').click();
+    await panel.getByRole('button', { name: 'Sloth', exact: true }).click();
+    await expect(inspectorTitle(page)).toHaveText('Sloth');
+    await expect.poll(() => art.last().locator('img').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+    await panel.getByRole('button', { name: '← All graphics' }).click();
+    await page.getByTestId('pack-pack-badges').click();
+    await panel.getByRole('button', { name: 'Trophy rosette (Gold)', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Gold', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await panel.getByRole('button', { name: '← All graphics' }).click();
+    await page.getByTestId('pack-pack-girl-power').click();
+    await panel.getByRole('button', { name: 'Girl power, pointing up', exact: true }).click();
+    await panel.getByRole('button', { name: '← All graphics' }).click();
+    for (let i = 0; i < 3; i++) await page.keyboard.press('Control+z');
+
+    // Search reaches inside packs (zodiac by name or month, flowers by Filipino name).
+    await panel.getByLabel('Search graphics').fill('leo');
+    await page.getByTestId('graphic-results').getByRole('button', { name: /^Leo \(Jul 23/ }).click();
+    await panel.getByLabel('Search graphics').fill('gumamela');
+    await expect(page.getByTestId('graphic-results').getByRole('button', { name: /^Gumamela \(/ })).toHaveCount(2);
+    await panel.getByLabel('Search graphics').fill('');
+    await expect(art).toHaveCount(4);
+
+    // Lay them out so the screenshot shows each one.
+    const place = async (i: number, x: number, y: number) => {
+      await art.nth(i).click({ position: { x: 5, y: 5 }, force: true });
+      await page.getByLabel('X', { exact: true }).fill(String(x));
+      await page.getByLabel('Y', { exact: true }).fill(String(y));
+    };
+    await place(0, 40, 60);
+    await place(1, 470, 60);
+    await place(2, 60, 420);
+    await place(3, 480, 460);
+    await page.screenshot({ path: 'e2e/shots/20-packs-page.png' });
+    expect(errors).toEqual([]);
+  });
+
   test('autosaves and restores after reload', async ({ page }) => {
     await openStudio(page);
     await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -323,7 +671,7 @@ test.describe('Kalendaryo Studio', () => {
   });
 
   test('exports a PNG', async ({ page }) => {
-    await openStudio(page);
+    const errors = await openStudio(page);
     const dl = page.waitForEvent('download');
     await page.getByRole('button', { name: 'PNG' }).click();
     const file = await dl;
@@ -332,6 +680,7 @@ test.describe('Kalendaryo Studio', () => {
     const fs = await import('node:fs');
     expect(fs.statSync(path).size).toBeGreaterThan(50_000);
     fs.copyFileSync(path, 'e2e/shots/08-export.png');
+    expect(errors).toEqual([]);
   });
 
   test('print renders pages at paper size', async ({ page }) => {
