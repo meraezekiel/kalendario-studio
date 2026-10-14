@@ -7,7 +7,7 @@ import { readImage } from '@/lib/calendar/samplePhoto';
 import { giveCal, TEMPLATES } from '@/lib/calendar/templates';
 import type { CalEl, El, Page, ShapeEl, ShapeKind } from '@/lib/calendar/types';
 import { clamp, clone, uid } from '@/lib/calendar/utils';
-import { curPage, findEl, type PickTarget, toast, useStudioStore } from './useStudioStore';
+import { curPage, findEl, type PickTarget, selIds, toast, useStudioStore } from './useStudioStore';
 
 const S = () => useStudioStore.getState();
 
@@ -156,38 +156,63 @@ export function removeTrayItem(i: number) {
 
 export function deleteSelected() {
   const s = S();
-  if (!s.sel) return;
-  const id = s.sel;
+  const ids = selIds(s);
+  if (!ids.length) return;
   s.mutate((d) => {
     const pg = curPage(d);
-    pg.els = pg.els.filter((e) => e.id !== id);
+    pg.els = pg.els.filter((e) => !ids.includes(e.id));
   });
   s.select(null);
 }
 
-export function duplicate(src: El | null | undefined) {
-  if (!src) return;
-  const c = clone(src);
-  c.id = uid();
-  c.x += 20;
-  c.y += 20;
-  c.locked = false;
-  S().mutate((d) => void curPage(d).els.push(c));
-  S().select(c.id);
+/** Pastes copies of one or more elements, offset slightly, and selects them. */
+export function duplicate(src: El | El[] | null | undefined) {
+  const list = Array.isArray(src) ? src : src ? [src] : [];
+  if (!list.length) return;
+  const copies = list.map((e) => {
+    const c = clone(e);
+    c.id = uid();
+    c.x += 20;
+    c.y += 20;
+    c.locked = false;
+    return c;
+  });
+  S().mutate((d) => void curPage(d).els.push(...copies));
+  S().selectMany(copies.map((c) => c.id));
+}
+
+/** The selected elements in page (stacking) order. */
+export function selectedEls(): El[] {
+  const s = S();
+  const ids = selIds(s);
+  return curPage(s.doc).els.filter((e) => ids.includes(e.id));
 }
 
 export function copySelected() {
-  const el = findEl(S().doc, S().sel);
-  if (!el) return;
-  S().set({ clip: clone(el) });
+  const els = selectedEls();
+  if (!els.length) return;
+  S().set({ clip: els.map(clone) });
   toast('Copied. Press Ctrl+V to paste, on this or another page.');
 }
 
+export function selectAll() {
+  S().selectMany(curPage(S().doc).els.filter((e) => !e.hidden && !e.locked).map((e) => e.id));
+}
+
+/** Changes stacking order. A multi-selection keeps its own relative order. */
 export function arrange(how: 'front' | 'back' | 'fwd' | 'bwd') {
-  const id = S().sel;
+  const ids = selIds(S());
+  if (!ids.length) return;
   S().mutate((d) => {
-    const els = curPage(d).els;
-    const i = els.findIndex((e) => e.id === id);
+    const pg = curPage(d);
+    if (ids.length > 1) {
+      const picked = pg.els.filter((e) => ids.includes(e.id));
+      const rest = pg.els.filter((e) => !ids.includes(e.id));
+      pg.els = how === 'back' || how === 'bwd' ? [...picked, ...rest] : [...rest, ...picked];
+      return;
+    }
+    const els = pg.els;
+    const i = els.findIndex((e) => e.id === ids[0]);
     if (i < 0) return;
     const [el] = els.splice(i, 1);
     const j = how === 'front' ? els.length : how === 'back' ? 0 : how === 'fwd' ? Math.min(els.length, i + 1) : Math.max(0, i - 1);
@@ -196,23 +221,74 @@ export function arrange(how: 'front' | 'back' | 'fwd' | 'bwd') {
 }
 
 export function nudge(dx: number, dy: number) {
-  const id = S().sel;
-  if (!id) return;
+  const ids = selIds(S());
+  if (!ids.length) return;
   S().mutate((d) => {
-    const el = findEl(d, id);
-    if (el && !el.locked) {
-      el.x += dx;
-      el.y += dy;
+    for (const id of ids) {
+      const el = findEl(d, id);
+      if (el && !el.locked) {
+        el.x += dx;
+        el.y += dy;
+      }
     }
-  }, { key: `nudge:${id}` });
+  }, { key: `nudge:${ids.join()}` });
 }
 
+/** Bounding box of elements (ignoring rotation). */
+export function boundsOf(els: El[]) {
+  const x = Math.min(...els.map((e) => e.x)), y = Math.min(...els.map((e) => e.y));
+  const r = Math.max(...els.map((e) => e.x + e.w)), b = Math.max(...els.map((e) => e.y + e.h));
+  return { x, y, w: r - x, h: b - y };
+}
+
+export type Align = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
+
+/** Lines up the selected elements with each other (edges or centres of their shared box). */
+export function alignSelected(how: Align) {
+  const els = selectedEls().filter((e) => !e.locked);
+  if (els.length < 2) return;
+  const B = boundsOf(els);
+  S().mutate((d) => {
+    for (const { id } of els) {
+      const e = findEl(d, id)!;
+      if (how === 'left') e.x = B.x;
+      else if (how === 'right') e.x = B.x + B.w - e.w;
+      else if (how === 'hcenter') e.x = Math.round(B.x + (B.w - e.w) / 2);
+      else if (how === 'top') e.y = B.y;
+      else if (how === 'bottom') e.y = B.y + B.h - e.h;
+      else e.y = Math.round(B.y + (B.h - e.h) / 2);
+    }
+  });
+}
+
+/** Centres the selection as a group horizontally on the page. */
+export function centerSelectedOnPage() {
+  const els = selectedEls().filter((e) => !e.locked);
+  if (!els.length) return;
+  const B = boundsOf(els);
+  const dx = Math.round((dims(curPage(S().doc)).W - B.w) / 2 - B.x);
+  S().mutate((d) => {
+    for (const { id } of els) findEl(d, id)!.x += dx;
+  });
+}
+
+/** Locks every selected element, or unlocks them all when they are all locked already. */
+export function toggleLockSelected() {
+  const els = selectedEls();
+  const lock = !els.every((e) => e.locked);
+  S().mutate((d) => {
+    for (const { id } of els) findEl(d, id)!.locked = lock;
+  });
+}
 export function toggleFlag(id: string, flag: 'hidden' | 'locked') {
   S().mutate((d) => {
     const el = findEl(d, id);
     if (el) el[flag] = !el[flag];
   });
-  if (flag === 'hidden' && S().sel === id && findEl(S().doc, id)?.hidden) S().select(null);
+  if (flag !== 'hidden' || !findEl(S().doc, id)?.hidden) return;
+  const s = S();
+  if (s.sel === id) s.select(null);
+  else if (s.multi.includes(id)) s.selectMany(s.multi.filter((x) => x !== id));
 }
 
 /* ---------- pages ---------- */
@@ -220,7 +296,7 @@ export function toggleFlag(id: string, flag: 'hidden' | 'locked') {
 export function goToPage(i: number) {
   const s = S();
   if (i < 0 || i >= s.doc.pages.length) return;
-  s.set({ sel: null, selDay: null, cropId: null, editing: null });
+  s.select(null);
   s.mutate((d) => void (d.cur = i), { history: false });
 }
 
@@ -258,7 +334,7 @@ export function applyTemplate(key: string) {
     d.cur = 0;
     makeYear(d);
   });
-  S().set({ sel: null, selDay: null, cropId: null, editing: null });
+  S().select(null);
   toast(`${TEMPLATES[key].name}: ${S().doc.pages.length} pages ready. Change anything, then use “Apply design to all months”.`);
 }
 

@@ -172,6 +172,84 @@ test.describe('Kalendaryo Studio', () => {
     await expect(stageEls(page)).toHaveCount(n + 1);
   });
 
+  test('box-selects the giveaway ad block and drags it as a group', async ({ page }) => {
+    const errors = await openStudio(page);
+    await chooseTemplate(page, 'Giveaway · 3 months');
+    const pg = (await page.locator('.ph .page').boundingBox())!;
+    const cal = page.locator('.ph .el-cal').last();
+    const ad = page.locator('.ph .tx', { hasText: 'BITUIN PRINTING' });
+    const cal0 = (await cal.boundingBox())!;
+    const ad0 = (await ad.boundingBox())!;
+
+    // Drag a selection box from the grey area beside the page around the bottom ad block.
+    await page.mouse.move(pg.x - 12, pg.y + pg.height * 0.76);
+    await page.mouse.down();
+    await page.mouse.move(pg.x + pg.width / 2, pg.y + pg.height * 0.9, { steps: 4 });
+    await expect(page.getByTestId('marquee')).toBeVisible();
+    await page.mouse.move(pg.x + pg.width + 12, pg.y + pg.height + 12, { steps: 4 });
+    await page.mouse.up();
+    await expect(page.getByTestId('marquee')).toHaveCount(0);
+    await expect(page.getByTestId('group-selection')).toBeVisible();
+    const n = parseInt((await inspectorTitle(page).textContent())!);
+    expect(n).toBeGreaterThanOrEqual(5);
+    await expect(page.getByTestId('layers').locator('.layer.on')).toHaveCount(n);
+    await page.screenshot({ path: 'e2e/shots/10-multi-marquee.png' });
+
+    // Dragging one selected item moves the whole block; the calendars stay put.
+    await page.mouse.move(ad0.x + ad0.width / 2, ad0.y + ad0.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(ad0.x + ad0.width / 2, ad0.y + ad0.height / 2 - 60, { steps: 8 });
+    await page.mouse.up();
+    const ad1 = (await ad.boundingBox())!;
+    expect(ad0.y - ad1.y).toBeGreaterThan(40);
+    expect((await cal.boundingBox())!.y).toBeCloseTo(cal0.y, 0);
+    await expect(inspectorTitle(page)).toHaveText(`${n} elements`); // still a group after the drag
+    await page.screenshot({ path: 'e2e/shots/11-multi-moved.png' });
+
+    // One undo puts the whole block back.
+    await page.keyboard.press('Control+z');
+    await expect.poll(async () => (await ad.boundingBox())!.y).toBeCloseTo(ad0.y, 0);
+    expect(errors).toEqual([]);
+  });
+
+  test('shift-click selects several items; keyboard acts on all of them', async ({ page }) => {
+    await openStudio(page);
+    const n = await stageEls(page).count();
+    const caption = page.locator('.ph .tx', { hasText: 'Our Family 2027' });
+    const photo = page.locator('.ph .el-image').first();
+    await caption.click();
+    await photo.click({ modifiers: ['Shift'] });
+    await expect(inspectorTitle(page)).toHaveText('2 elements');
+
+    const c0 = (await caption.boundingBox())!, p0 = (await photo.boundingBox())!;
+    await page.keyboard.press('Shift+ArrowRight');
+    await expect.poll(async () => (await caption.boundingBox())!.x).toBeGreaterThan(c0.x + 3);
+    expect((await photo.boundingBox())!.x).toBeGreaterThan(p0.x + 3);
+
+    // Shift-clicking a selected item removes it from the selection.
+    await photo.click({ modifiers: ['Shift'] });
+    await expect(inspectorTitle(page)).toHaveText('Caption');
+    await photo.click({ modifiers: ['Shift'] });
+    await expect(inspectorTitle(page)).toHaveText('2 elements');
+
+    await page.keyboard.press('Control+d');
+    await expect(stageEls(page)).toHaveCount(n + 2);
+    await expect(inspectorTitle(page)).toHaveText('2 elements'); // the copies are selected
+    await page.keyboard.press('Delete');
+    await expect(stageEls(page)).toHaveCount(n);
+
+    await page.keyboard.press('Control+a');
+    await expect(inspectorTitle(page)).toHaveText(`${n} elements`);
+    await page.getByRole('button', { name: 'Deselect' }).click();
+    await expect(inspectorTitle(page)).toHaveText(/Page 1/);
+
+    // Layers list supports Shift-click too.
+    const layers = page.getByTestId('layers').locator('.layer');
+    await layers.nth(0).click();
+    await layers.nth(1).click({ modifiers: ['Shift'] });
+    await expect(inspectorTitle(page)).toHaveText('2 elements');
+  });
+
   test('autosaves and restores after reload', async ({ page }) => {
     await openStudio(page);
     await page.getByRole('button', { name: 'Add', exact: true }).click();

@@ -2,17 +2,20 @@ import { type PointerEvent as RPointerEvent, type RefObject, useRef } from 'reac
 import { ASPECT_SHAPES } from '@/lib/calendar/constants';
 import { dims } from '@/lib/calendar/document';
 import { assetFor, imageScale } from '@/lib/calendar/render';
-import type { El } from '@/lib/calendar/types';
+import type { CalendarDoc, El } from '@/lib/calendar/types';
 import { clamp, r1 } from '@/lib/calendar/utils';
-import { placeAsset } from '@/store/actions';
-import { curPage, findEl, type Guide, type PickTarget, useStudioStore } from '@/store/useStudioStore';
+import { boundsOf, placeAsset } from '@/store/actions';
+import { curPage, findEl, type Guide, type PickTarget, selIds, useStudioStore } from '@/store/useStudioStore';
 import { useDoubleClickHandler } from './useDoubleClickHandler';
 
 type Drag =
   | { mode: 'move'; id: string; sx: number; sy: number; x0: number; y0: number; moved: boolean; cell: number | null; started: boolean }
   | { mode: 'rs'; id: string; h: string; sx: number; sy: number; x0: number; y0: number; w0: number; h0: number; size0: number; started: boolean }
   | { mode: 'rot'; id: string; started: boolean }
-  | { mode: 'pan'; id: string; sx: number; sy: number; px: number; py: number; iw: number; ih: number; bw: number; bh: number; started: boolean };
+  | { mode: 'pan'; id: string; sx: number; sy: number; px: number; py: number; iw: number; ih: number; bw: number; bh: number; started: boolean }
+  /** Moves every selected element; `collapse` is the element to select alone if this turns out to be a plain click. */
+  | { mode: 'group'; id: string; ids: string[]; sx: number; sy: number; starts: Record<string, [number, number]>; box: { x: number; y: number; w: number; h: number }; moved: boolean; collapse: string | null; started: boolean }
+  | { mode: 'marquee'; id: string; x0: number; y0: number; base: string[]; started: boolean };
 
 const S = () => useStudioStore.getState();
 
@@ -28,21 +31,21 @@ export function dropTarget(t: Element | null): PickTarget {
   return null;
 }
 
-/** Snaps a moving element's edges/centre to the page and other elements' edges/centres. */
-function snapMove(el: El, nx: number, ny: number, scale: number): [number, number, Guide[]] {
+/** Snaps a moving box's edges/centre to the page and to the edges/centres of elements not in `skip`. */
+function snapMove(skip: string[], w: number, h: number, nx: number, ny: number, scale: number): [number, number, Guide[]] {
   const pg = curPage(S().doc);
   const D = dims(pg), T = Math.min(10, 6 / scale);
   const xs = [0, D.W / 2, D.W], ys = [0, D.H / 2, D.H];
   pg.els.forEach((o) => {
-    if (o.id === el.id || o.hidden) return;
+    if (skip.includes(o.id) || o.hidden) return;
     xs.push(o.x, o.x + o.w / 2, o.x + o.w);
     ys.push(o.y, o.y + o.h / 2, o.y + o.h);
   });
   type Hit = { d: number; t: number } | null;
   let bx = null as Hit, by = null as Hit, b = T;
-  for (const off of [0, el.w / 2, el.w]) for (const t of xs) { const d = t - (nx + off); if (Math.abs(d) < b) { b = Math.abs(d); bx = { d, t }; } }
+  for (const off of [0, w / 2, w]) for (const t of xs) { const d = t - (nx + off); if (Math.abs(d) < b) { b = Math.abs(d); bx = { d, t }; } }
   b = T;
-  for (const off of [0, el.h / 2, el.h]) for (const t of ys) { const d = t - (ny + off); if (Math.abs(d) < b) { b = Math.abs(d); by = { d, t }; } }
+  for (const off of [0, h / 2, h]) for (const t of ys) { const d = t - (ny + off); if (Math.abs(d) < b) { b = Math.abs(d); by = { d, t }; } }
   const guides: Guide[] = [];
   if (bx) { nx += bx.d; guides.push({ v: bx.t }); }
   if (by) { ny += by.d; guides.push({ h: by.t }); }
@@ -60,10 +63,25 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
     return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale };
   };
   /** Changes during a drag share one undo step, recorded on the first real change. */
-  const live = (d: Drag, recipe: (el: El) => void) => {
+  const liveDoc = (d: Drag, recipe: (doc: CalendarDoc) => void) => {
     const st = S();
     if (!d.started) { st.checkpoint(); d.started = true; }
-    st.mutate((doc) => { const el = findEl(doc, d.id); if (el) recipe(el); }, { history: false });
+    st.mutate(recipe, { history: false });
+  };
+  const live = (d: Drag, recipe: (el: El) => void) => liveDoc(d, (doc) => { const el = findEl(doc, d.id); if (el) recipe(el); });
+
+  const startGroup = (e: RPointerEvent, ids: string[], collapse: string | null) => {
+    const els = curPage(S().doc).els.filter((x) => ids.includes(x.id) && !x.locked);
+    if (!els.length) return;
+    const starts: Record<string, [number, number]> = {};
+    els.forEach((x) => (starts[x.id] = [x.x, x.y]));
+    drag.current = { mode: 'group', id: els[0].id, ids: els.map((x) => x.id), sx: e.clientX, sy: e.clientY, starts, box: boundsOf(els), moved: false, collapse, started: false };
+  };
+  const startMarquee = (e: RPointerEvent, additive: boolean) => {
+    const st = S();
+    if (!additive) st.select(null);
+    const p = pagePt(e);
+    drag.current = { mode: 'marquee', id: '', x0: p.x, y0: p.y, base: additive ? selIds(st) : [], started: false };
   };
 
   const onPointerDown = (e: RPointerEvent) => {
@@ -74,15 +92,21 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
     if (active?.isContentEditable) active.blur();
     const st = S();
     const wrap = wrapRef.current!;
+    const additive = e.shiftKey || e.ctrlKey || e.metaKey;
     if (!target.closest('.ph')) {
-      if (target === wrap || target.classList.contains('scaler')) st.select(null);
+      // Dragging on the grey area around the page draws a selection box.
+      if ((target === wrap || target.classList.contains('scaler')) && st.armed === null) {
+        wrap.setPointerCapture(e.pointerId);
+        startMarquee(e, additive);
+      }
       return;
     }
 
     const hd = target.closest<HTMLElement>('[data-h]');
     const el0 = findEl(st.doc, st.sel);
     const now = performance.now();
-    const dbl = !hd && st.armed === null && now - lastDown.current.t < 450 && Math.hypot(e.clientX - lastDown.current.x, e.clientY - lastDown.current.y) < 8;
+    // Shift/Ctrl-clicks only toggle selection, so two quick ones are never a double-click.
+    const dbl = !hd && !additive && st.armed === null && now - lastDown.current.t < 450 && Math.hypot(e.clientX - lastDown.current.x, e.clientY - lastDown.current.y) < 8;
     lastDown.current = { t: dbl ? 0 : now, x: e.clientX, y: e.clientY };
     if (dbl && dblAt(e.clientX, e.clientY)) { e.preventDefault(); drag.current = null; return; }
 
@@ -101,9 +125,32 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
       placeAsset(id, dropTarget(target), pagePt(e));
       return;
     }
-    if (!elN) { st.select(null); return; }
+    if (!elN) {
+      wrap.setPointerCapture(e.pointerId);
+      startMarquee(e, additive);
+      return;
+    }
     const el = findEl(st.doc, elN.dataset.id ?? null);
     if (!el) return;
+
+    // Shift/Ctrl-click adds or removes an element; dragging then moves the whole selection.
+    if (additive) {
+      const cur = selIds(st);
+      const next = cur.includes(el.id) ? cur.filter((x) => x !== el.id) : [...cur, el.id];
+      st.selectMany(next);
+      if (!next.includes(el.id)) return;
+      e.preventDefault();
+      wrap.setPointerCapture(e.pointerId);
+      startGroup(e, next, null);
+      return;
+    }
+    if (st.multi.includes(el.id)) {
+      e.preventDefault();
+      wrap.setPointerCapture(e.pointerId);
+      startGroup(e, st.multi, el.id);
+      return;
+    }
+
     const wasSel = st.sel === el.id;
     if (!wasSel) st.select(el.id);
     if (el.locked) return;
@@ -125,6 +172,32 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
   const onPointerMove = (e: RPointerEvent) => {
     const d = drag.current;
     if (!d) return;
+
+    if (d.mode === 'marquee') {
+      const p = pagePt(e);
+      const r = { x: Math.min(d.x0, p.x), y: Math.min(d.y0, p.y), w: Math.abs(p.x - d.x0), h: Math.abs(p.y - d.y0) };
+      if (!d.started && (r.w + r.h) * scale < 4) return;
+      d.started = true;
+      S().set({ marquee: r });
+      return;
+    }
+    if (d.mode === 'group') {
+      const dx = (e.clientX - d.sx) / scale, dy = (e.clientY - d.sy) / scale;
+      if (!d.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+      d.moved = true;
+      let nx = d.box.x + dx, ny = d.box.y + dy, guides: Guide[] = [];
+      if (!e.altKey) [nx, ny, guides] = snapMove(d.ids, d.box.w, d.box.h, nx, ny, scale);
+      const mx = Math.round(nx - d.box.x), my = Math.round(ny - d.box.y);
+      liveDoc(d, (doc) => {
+        for (const id of d.ids) {
+          const x = findEl(doc, id);
+          if (x) { x.x = d.starts[id][0] + mx; x.y = d.starts[id][1] + my; }
+        }
+      });
+      S().set({ guides });
+      return;
+    }
+
     const el = findEl(S().doc, d.id);
     if (!el) return;
 
@@ -133,7 +206,7 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
       if (!d.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
       d.moved = true;
       let nx = d.x0 + dx, ny = d.y0 + dy, guides: Guide[] = [];
-      if (!e.altKey && !(el.rot % 360)) [nx, ny, guides] = snapMove(el, nx, ny, scale);
+      if (!e.altKey && !(el.rot % 360)) [nx, ny, guides] = snapMove([el.id], el.w, el.h, nx, ny, scale);
       live(d, (x) => { x.x = Math.round(nx); x.y = Math.round(ny); });
       S().set({ guides });
     } else if (d.mode === 'rs') {
@@ -175,6 +248,19 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
     drag.current = null;
     const st = S();
     if (st.guides.length) st.set({ guides: [] });
+    if (d.mode === 'marquee') {
+      const r = st.marquee;
+      if (!r) return;
+      st.set({ marquee: null });
+      // Everything the box touches, except hidden and locked elements.
+      const hit = curPage(st.doc).els
+        .filter((x) => !x.hidden && !x.locked && x.x < r.x + r.w && x.x + x.w > r.x && x.y < r.y + r.h && x.y + x.h > r.y)
+        .map((x) => x.id);
+      st.selectMany([...d.base, ...hit.filter((id) => !d.base.includes(id))]);
+      return;
+    }
+    // A plain click on one element of a multi-selection selects just that element.
+    if (d.mode === 'group' && !d.moved && d.collapse) st.select(d.collapse);
     // A plain click on a day of the already-selected calendar selects that day.
     if (d.mode === 'move' && !d.moved && d.cell != null) st.select(d.id, d.cell);
   };

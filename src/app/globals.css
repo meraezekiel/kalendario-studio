@@ -152,6 +152,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .hd.n,.hd.s{width:20px;height:9px;border-radius:5px}.hd.e,.hd.w{width:9px;height:20px;border-radius:5px}
 .hd.rot{left:50%;top:calc(-30px * var(--inv,1));width:22px;height:22px;cursor:grab;display:grid;place-items:center;font:700 13px/1 sans-serif;color:#2f6fe4}
 .lockbadge{position:absolute;left:0;top:0;transform:translate(0,-120%) scale(var(--inv,1));transform-origin:left bottom;background:#8a93a8;color:#fff;font:600 11px 'Figtree',sans-serif;padding:2px 7px;border-radius:5px;white-space:nowrap}
+.sbox.member{outline-width:calc(1.5px * var(--inv,1))}
+.gbox{position:absolute;outline:calc(1px * var(--inv,1)) dashed #2f6fe4;outline-offset:calc(4px * var(--inv,1))}
+.gbadge{background:#2f6fe4;transform:translate(0,calc(-120% - 4px * var(--inv,1))) scale(var(--inv,1))}
+.marquee{position:absolute;background:rgba(47,111,228,.1);border:calc(1px * var(--inv,1)) solid #2f6fe4}
 .guide{position:absolute;background:#ff3b8a}
 .guide.v{top:0;bottom:0;width:calc(1px * var(--inv,1))}.guide.h{left:0;right:0;height:calc(1px * var(--inv,1))}
 

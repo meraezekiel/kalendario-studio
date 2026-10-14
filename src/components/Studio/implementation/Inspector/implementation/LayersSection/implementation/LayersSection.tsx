@@ -10,7 +10,7 @@ export default function LayersSection() {
       {layers.length ? (
         <div className="layers" data-testid="layers">
           {layers.map((l) => (
-            <div key={l.id} className={`layer${l.on ? ' on' : ''}${l.hidden ? ' off' : ''}`} onClick={() => pick(l.id)}>
+            <div key={l.id} className={`layer${l.on ? ' on' : ''}${l.hidden ? ' off' : ''}`} onClick={(e) => pick(l.id, e.shiftKey || e.ctrlKey || e.metaKey)}>
               <b>{l.type}</b>
               <span>{l.name}</span>
               <button title={l.hidden ? 'Show' : 'Hide'} aria-label={l.hidden ? `Show ${l.name}` : `Hide ${l.name}`} onClick={(e) => { e.stopPropagation(); toggleHidden(l.id); }}>

@@ -10,6 +10,7 @@ import type { CalendarDoc, El, Page } from '@/lib/calendar/types';
 export type DrawerTab = 'templates' | 'add' | 'photos' | 'page';
 export interface Guide { v?: number; h?: number }
 export interface Editing { id: string; day?: number }
+export interface Rect { x: number; y: number; w: number; h: number }
 export type PickTarget = { cal: string; day: number } | { img: string } | null;
 
 const HISTORY_LIMIT = 80;
@@ -25,12 +26,16 @@ interface StudioState {
   doc: CalendarDoc;
   ready: boolean;
   sel: string | null;
+  /** Ids of a multi-selection (two or more). When set, `sel` is null. */
+  multi: string[];
   selDay: number | null;
   cropId: string | null;
   armed: number | null;
   editing: Editing | null;
   tab: DrawerTab;
-  clip: El | null;
+  clip: El[];
+  /** Rubber-band selection rectangle in page coordinates while dragging. */
+  marquee: Rect | null;
   guides: Guide[];
   /** Page indexes being printed; PrintArea renders them and opens the print dialog. */
   printing: number[] | null;
@@ -49,7 +54,9 @@ interface StudioState {
   undo: () => void;
   redo: () => void;
   select: (id: string | null, day?: number | null) => void;
-  set: (patch: Partial<Pick<StudioState, 'cropId' | 'armed' | 'editing' | 'tab' | 'clip' | 'guides' | 'sel' | 'selDay' | 'printing' | 'exporting'>>) => void;
+  /** Selects several elements; one id falls back to a normal single selection. */
+  selectMany: (ids: string[]) => void;
+  set: (patch: Partial<Pick<StudioState, 'cropId' | 'armed' | 'editing' | 'tab' | 'clip' | 'guides' | 'marquee' | 'sel' | 'selDay' | 'printing' | 'exporting'>>) => void;
   showToast: (msg: string) => void;
   hydrate: (doc: CalendarDoc | null) => void;
 }
@@ -59,12 +66,14 @@ export const useStudioStore = create<StudioState>()(
     doc: freshDoc(),
     ready: false,
     sel: null,
+    multi: [],
     selDay: null,
     cropId: null,
     armed: null,
     editing: null,
     tab: 'templates',
-    clip: null,
+    clip: [],
+    marquee: null,
     guides: [],
     printing: null,
     exporting: false,
@@ -109,7 +118,7 @@ export const useStudioStore = create<StudioState>()(
         st.future.push(s.doc);
         // Uploaded photos stay in the tray even when the step that added them is undone.
         st.doc = { ...prev, assets: s.doc.assets, tray: s.doc.tray };
-        st.sel = null; st.selDay = null; st.cropId = null; st.editing = null; st.lastKey = null;
+        st.sel = null; st.multi = []; st.selDay = null; st.cropId = null; st.editing = null; st.lastKey = null;
       });
     },
 
@@ -121,17 +130,29 @@ export const useStudioStore = create<StudioState>()(
         st.future.pop();
         st.past.push(s.doc);
         st.doc = { ...next, assets: s.doc.assets, tray: s.doc.tray };
-        st.sel = null; st.selDay = null; st.cropId = null; st.editing = null; st.lastKey = null;
+        st.sel = null; st.multi = []; st.selDay = null; st.cropId = null; st.editing = null; st.lastKey = null;
       });
     },
 
     select: (id, day = null) =>
       set((st) => {
         st.sel = id;
+        st.multi = [];
         st.selDay = day;
         if (st.cropId && st.cropId !== id) st.cropId = null;
         if (st.editing && st.editing.id !== id) st.editing = null;
       }),
+
+    selectMany: (ids) => {
+      if (ids.length < 2) return get().select(ids[0] ?? null);
+      set((st) => {
+        st.sel = null;
+        st.multi = ids;
+        st.selDay = null;
+        st.cropId = null;
+        st.editing = null;
+      });
+    },
 
     set: (patch) => set((st) => void Object.assign(st, patch)),
 
@@ -149,6 +170,8 @@ export const useStudioStore = create<StudioState>()(
 export const curPage = (doc: CalendarDoc): Page => doc.pages[doc.cur] ?? doc.pages[0];
 export const findEl = (doc: CalendarDoc, id: string | null): El | undefined => (id ? curPage(doc).els.find((e) => e.id === id) : undefined);
 export const usePage = () => useStudioStore((s) => curPage(s.doc));
+/** Every selected element id: the multi-selection, or the single selection. */
+export const selIds = (s: { sel: string | null; multi: string[] }): string[] => (s.multi.length ? s.multi : s.sel ? [s.sel] : []);
 export const useSelEl = () => useStudioStore((s) => findEl(s.doc, s.sel));
 
 /** Patch fields of an element on the current page; consecutive edits of the same field merge into one undo step. */

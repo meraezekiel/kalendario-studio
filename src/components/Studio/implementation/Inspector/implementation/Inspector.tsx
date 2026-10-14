@@ -6,6 +6,7 @@ import DaySection from './DaySection/implementation/DaySection';
 import EventsSection from './EventsSection/implementation/EventsSection';
 import ImageSection from './ImageSection/implementation/ImageSection';
 import LayersSection from './LayersSection/implementation/LayersSection';
+import MultiSection from './MultiSection/implementation/MultiSection';
 import PageSection from './PageSection/implementation/PageSection';
 import ShapeSection from './ShapeSection/implementation/ShapeSection';
 import TextSection from './TextSection/implementation/TextSection';
@@ -13,11 +14,12 @@ import { useInspectorHandler } from './useInspectorHandler';
 
 /** Right-hand panel: settings for the selected element, or for the page when nothing is selected. */
 export default function Inspector() {
-  const { el, selDay, title } = useInspectorHandler();
+  const { el, selDay, title, multi } = useInspectorHandler();
   return (
     <aside className="insp" aria-label="Selected element">
       <p className="ititle" data-testid="insp-title">{title}</p>
-      {!el && <PageSection />}
+      {multi && <MultiSection />}
+      {!el && !multi && <PageSection />}
       {el?.type === 'cal' && selDay != null && <DaySection key={`${el.id}-${selDay}`} el={el} day={selDay} />}
       {el?.type === 'text' && <TextSection el={el} />}
       {el?.type === 'image' && <ImageSection el={el} />}

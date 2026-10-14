@@ -5,9 +5,10 @@ export function useInspectorHandler() {
   const el = useSelEl();
   const selDay = useStudioStore((s) => s.selDay);
   const cur = useStudioStore((s) => s.doc.cur);
+  const count = useStudioStore((s) => s.multi.length);
   const title = useStudioStore((s) => {
-    const e = el;
-    return e ? elName(e, s.doc.year, curPage(s.doc)) : `Page ${s.doc.cur + 1}`;
+    if (s.multi.length) return `${s.multi.length} elements`;
+    return el ? elName(el, s.doc.year, curPage(s.doc)) : `Page ${s.doc.cur + 1}`;
   });
-  return { el, selDay, cur, title };
+  return { el, selDay, cur, title, multi: count > 0 };
 }
