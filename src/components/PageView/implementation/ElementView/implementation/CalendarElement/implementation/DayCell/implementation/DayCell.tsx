@@ -1,0 +1,27 @@
+'use client';
+
+import type { CellView } from '../../useCalendarElementHandler';
+import { useDayCellHandler } from './useDayCellHandler';
+
+interface Props {
+  cell: CellView;
+  calId: string;
+  editing: boolean;
+}
+
+export default function DayCell({ cell, calId, editing }: Props) {
+  const { ref, commit, onKeyDown } = useDayCellHandler(calId, cell.day, cell.num, editing);
+  return (
+    <div className={cell.className} data-day={cell.day ?? undefined} style={cell.style}>
+      {cell.img && <div className="cimg" style={{ backgroundImage: `url('${cell.img}')` }} />}
+      {cell.num != null &&
+        (editing ? (
+          // Separate key: the editable span's text is owned by the browser while typing, not React.
+          <span key="edit" ref={ref} className="num" style={cell.numStyle} contentEditable suppressContentEditableWarning onBlur={commit} onKeyDown={onKeyDown} data-testid="day-editor" />
+        ) : (
+          <span key="view" className="num" style={cell.numStyle}>{cell.num}</span>
+        ))}
+      {cell.label && <span className="lbl" style={cell.labelStyle}>{cell.label}</span>}
+    </div>
+  );
+}

@@ -1,0 +1,45 @@
+import { expect, type Page } from '@playwright/test';
+
+/** Opens the editor and waits until fonts and the first page are ready; fails on any runtime error. */
+export async function openStudio(page: Page) {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => {
+    if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text());
+  });
+  await page.goto('/');
+  await expect(page.locator('.ph .page')).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  return errors;
+}
+
+export const stageEls = (page: Page) => page.locator('.ph .page > .el');
+export const inspectorTitle = (page: Page) => page.getByTestId('insp-title');
+
+/** A small solid-colour PNG generated in the browser. */
+export async function makePng(page: Page, color = '#2a9d8f', w = 320, h = 200): Promise<Buffer> {
+  const b64 = await page.evaluate(
+    ([c, w, h]) => {
+      const cv = document.createElement('canvas');
+      cv.width = +w;
+      cv.height = +h;
+      const g = cv.getContext('2d')!;
+      g.fillStyle = String(c);
+      g.fillRect(0, 0, +w, +h);
+      g.fillStyle = '#fff';
+      g.fillRect(+w / 4, +h / 4, +w / 2, +h / 2);
+      return cv.toDataURL('image/png').split(',')[1];
+    },
+    [color, w, h] as const,
+  );
+  return Buffer.from(b64, 'base64');
+}
+
+/** Clicks a template card twice (the second click confirms replacing the calendar). */
+export async function chooseTemplate(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Templates' }).click();
+  const card = page.locator('.tpl', { hasText: name });
+  await card.click();
+  await expect(page.locator('.tpl[data-armed]')).toHaveCount(1);
+  await page.locator('.tpl[data-armed]').click();
+}
