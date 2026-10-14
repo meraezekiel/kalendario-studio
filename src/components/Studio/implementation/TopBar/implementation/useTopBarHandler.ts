@@ -1,9 +1,21 @@
+import { useSyncExternalStore } from 'react';
 import { MONTHS } from '@/lib/calendar/constants';
 import { monthOf } from '@/lib/calendar/document';
 import { applyDesignToAll, exportPNG, goToPage, printPages } from '@/store/actions';
 import { curPage, useStudioStore } from '@/store/useStudioStore';
 
+/** Inside a frame (e.g. an embedded preview) printing and downloads are usually blocked. */
+const isFramed = () => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+};
+const noSubscribe = () => () => {};
+
 export function useTopBarHandler() {
+  const framed = useSyncExternalStore(noSubscribe, isFramed, () => false);
   const label = useStudioStore((s) => {
     const pg = curPage(s.doc);
     const { m } = monthOf(s.doc.year, pg);
@@ -14,6 +26,7 @@ export function useTopBarHandler() {
   const canRedo = useStudioStore((s) => s.future.length > 0);
   const st = useStudioStore.getState;
   return {
+    framed,
     label,
     canUndo,
     canRedo,

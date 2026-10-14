@@ -18,11 +18,15 @@ export default function TopBar() {
       </div>
       <div className="grow" />
       <ConfirmButton onConfirm={h.sync} title="Copy this page's layout, text and stickers to the other months">Apply design to all months</ConfirmButton>
-      <span style={{ display: 'flex', gap: 8 }}>
-        <button className="btn primary" onClick={h.printOne}>Print page</button>
-        <button className="btn" onClick={h.printAll}>Print all</button>
-        <button className="btn" onClick={h.png}>PNG</button>
-      </span>
+      {h.framed ? (
+        <span className="hint">Print from the downloaded file</span>
+      ) : (
+        <span style={{ display: 'flex', gap: 8 }}>
+          <button className="btn primary" onClick={h.printOne}>Print page</button>
+          <button className="btn" onClick={h.printAll}>Print all</button>
+          <button className="btn" onClick={h.png}>PNG</button>
+        </span>
+      )}
     </header>
   );
 }

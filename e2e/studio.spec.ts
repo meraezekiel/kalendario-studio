@@ -250,6 +250,68 @@ test.describe('Kalendaryo Studio', () => {
     await expect(inspectorTitle(page)).toHaveText('2 elements');
   });
 
+  test('inspector and page controls from the original editor', async ({ page }) => {
+    const errors = await openStudio(page);
+    const cal = page.locator('.ph .el-cal');
+
+    // Calendar: header bar, red days, holiday labels.
+    await cal.locator('.cell[data-day="5"]').click();
+    await page.locator('summary', { hasText: 'Header bar' }).click();
+    await page.getByLabel('Show header bar').check();
+    await expect(cal.locator('.chead')).toContainText('JANUARY 2027');
+    await page.locator('summary', { hasText: 'Day numbers' }).click();
+    await page.locator('.dows button', { hasText: 'We' }).click();
+    await expect(cal.locator('.cell[data-day="6"] .num')).toHaveCSS('color', 'rgb(226, 85, 127)');
+    await page.getByLabel('Show holiday names in the boxes').uncheck();
+    await expect(cal.locator('.lbl', { hasText: "New Year's Day" })).toHaveCount(0);
+
+    // Photo: circle, empty frame, sample photo.
+    const photo = page.locator('.ph .el-image').first();
+    await photo.click();
+    await page.getByRole('button', { name: 'Make it a circle' }).click();
+    const pb = (await photo.boundingBox())!;
+    expect(Math.abs(pb.width - pb.height)).toBeLessThan(2);
+    await page.getByRole('button', { name: 'Empty frame' }).click();
+    await expect(photo.locator('.ph-empty')).toBeVisible();
+    await page.getByRole('button', { name: 'Use a sample photo' }).click();
+    await expect(photo.locator('.im')).toBeVisible();
+
+    // Hiding the selected layer deselects it.
+    await page.getByRole('button', { name: /^Hide Main photo/ }).click();
+    await expect(inspectorTitle(page)).toHaveText(/Page 1/);
+    await expect(photo).toHaveCount(0);
+
+    // Shape: change kind from the inspector.
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await page.getByRole('button', { name: 'Heart' }).click();
+    await page.getByRole('combobox', { name: /^Shape/ }).selectOption('star');
+    await expect(inspectorTitle(page)).toHaveText('Star');
+
+    // Pages: year, holidays, duplicate, move, delete with confirm.
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    await page.getByRole('spinbutton', { name: 'Year' }).fill('2030');
+    await expect(page.locator('.ph .tx', { hasText: 'Our Family 2030' })).toBeVisible();
+    await page.getByLabel('Show Philippine holidays').uncheck();
+    await page.getByRole('button', { name: 'Duplicate page' }).click();
+    await expect(page.getByTestId('page-label')).toHaveText(/Page 2 of 13 · January/);
+    await page.getByRole('button', { name: 'Move later' }).click();
+    await expect(page.getByTestId('page-label')).toHaveText(/Page 3 of 13 · January/);
+    const del = page.getByRole('button', { name: 'Delete this page' });
+    await del.click();
+    await expect(page.getByTestId('page-label')).toHaveText(/of 13/); // first click only arms
+    await page.getByRole('button', { name: 'Click again to confirm' }).click();
+    await expect(page.getByTestId('page-label')).toHaveText(/of 12/);
+    expect(errors).toEqual([]);
+  });
+
+  test('inside a frame, print and PNG are replaced by a hint', async ({ page, baseURL }) => {
+    await page.setContent(`<iframe src="${baseURL}/" style="width:1400px;height:860px;border:0"></iframe>`);
+    const f = page.frameLocator('iframe');
+    await expect(f.locator('.ph .page')).toBeVisible();
+    await expect(f.getByText('Print from the downloaded file')).toBeVisible();
+    await expect(f.getByRole('button', { name: 'Print page' })).toHaveCount(0);
+  });
+
   test('autosaves and restores after reload', async ({ page }) => {
     await openStudio(page);
     await page.getByRole('button', { name: 'Add', exact: true }).click();
