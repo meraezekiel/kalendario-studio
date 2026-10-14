@@ -698,4 +698,78 @@ test.describe('Kalendaryo Studio', () => {
     expect(await page.evaluate(() => (window as unknown as { __sheets: number }).__sheets)).toBe(12);
     expect(await page.locator('#pagesize').textContent()).toContain('210mm 297mm');
   });
+  test('desk, wallpaper and mini 3x3 templates use their own page sizes', async ({ page }) => {
+    const errors = await openStudio(page);
+    const ratio = async () => {
+      const b = (await page.locator('.ph .page').boundingBox())!;
+      return b.width / b.height;
+    };
+    await chooseTemplate(page, 'Desk calendar 8×5 in');
+    await expect(page.getByTestId('page-label')).toHaveText(/Page 1 of 12/);
+    expect(await ratio()).toBeCloseTo(8 / 5, 1);
+    await expect(page.locator('.ph .el-cal')).toHaveCount(1);
+    await page.screenshot({ path: 'e2e/shots/30-desk.png' });
+
+    await chooseTemplate(page, 'Desktop wallpaper');
+    expect(await ratio()).toBeCloseTo(16 / 9, 1);
+    await expect(page.locator('.ph [data-bg]')).toHaveCount(1);
+    await page.screenshot({ path: 'e2e/shots/31-wallpaper.png' });
+
+    await chooseTemplate(page, 'Mini 3×3 in');
+    expect(await ratio()).toBeCloseTo(1, 2);
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    // Square paper has no portrait/landscape choice.
+    await expect(page.getByRole('button', { name: 'Landscape' })).toHaveCount(0);
+    await page.screenshot({ path: 'e2e/shots/32-mini3.png' });
+    expect(errors).toEqual([]);
+  });
+
+  test('custom paper size in inches and cm, printed at that size', async ({ page }) => {
+    const errors = await openStudio(page);
+    const box = () => page.locator('.ph .page').boundingBox().then((b) => b!);
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    await page.getByLabel('Paper').selectOption('Custom');
+    const w = page.getByLabel('Width (in)'), h = page.getByLabel('Height (in)');
+    await expect(w).toHaveValue('8.27'); // starts from the A4 page it replaced
+    await w.fill('3');
+    await w.press('Enter');
+    await h.fill('3');
+    await h.press('Enter');
+    let b = await box();
+    expect(b.width / b.height).toBeCloseTo(1, 2);
+    await expect(page.getByLabel('Paper')).toHaveValue('Custom');
+
+    await w.fill('12');
+    await w.press('Enter');
+    b = await box();
+    expect(b.width / b.height).toBeCloseTo(4, 1);
+    await expect(page.getByRole('button', { name: 'Landscape' })).toHaveAttribute('aria-pressed', 'true');
+    // Out of range sizes are refused and the field goes back.
+    await w.fill('0.1');
+    await w.press('Enter');
+    await expect(w).toHaveValue('12');
+
+    await page.getByLabel('Unit').selectOption('cm');
+    await expect(page.getByLabel('Width (cm)')).toHaveValue('30.48');
+    await page.getByRole('button', { name: 'Portrait' }).click();
+    await expect(page.getByLabel('Width (cm)')).toHaveValue('7.62');
+    await expect(page.getByLabel('Height (cm)')).toHaveValue('30.48');
+
+    await page.getByRole('button', { name: 'Add blank page' }).click();
+    await expect(page.getByLabel('Width (cm)')).toHaveValue('7.62');
+    await page.screenshot({ path: 'e2e/shots/33-custom.png' });
+
+    await page.evaluate(() => {
+      window.print = () => void ((window as unknown as { __printed: boolean }).__printed = true);
+    });
+    await page.getByRole('button', { name: 'Print page' }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __printed: boolean }).__printed)).toBe(true);
+    expect(await page.locator('#pagesize').textContent()).toContain('76.2mm 304.8mm');
+
+    await page.reload();
+    await expect(page.locator('.ph .page')).toBeVisible();
+    b = await box();
+    expect(b.height / b.width).toBeCloseTo(4, 1);
+    expect(errors).toEqual([]);
+  });
 });

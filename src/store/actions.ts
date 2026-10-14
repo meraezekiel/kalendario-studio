@@ -1,6 +1,6 @@
 'use client';
 
-import { MONTHS } from '@/lib/calendar/constants';
+import { CUSTOM_MAX, CUSTOM_MIN, MONTHS, UNIT_MM } from '@/lib/calendar/constants';
 import { assetInUse, clonePage, dims, ensureBackground, makeYear, mkBackground, syncDesign } from '@/lib/calendar/document';
 import { mkCal, mkEvents, mkGraphic, mkImage, mkPage, mkShape, mkText } from '@/lib/calendar/factories';
 import { DECOS } from '@/lib/graphics/deco';
@@ -381,7 +381,7 @@ export function goToPage(i: number) {
 export function addPage(duplicateCurrent = false) {
   S().mutate((d) => {
     const pg = curPage(d);
-    const p = duplicateCurrent ? clonePage(pg) : { ...mkPage(pg.paper.size, pg.paper.o, '#ffffff', []), month: pg.month };
+    const p = duplicateCurrent ? clonePage(pg) : { ...mkPage(pg.paper.size, pg.paper.o, '#ffffff', []), paper: { ...pg.paper }, month: pg.month };
     d.pages.splice(d.cur + 1, 0, p);
     d.cur++;
   });
@@ -436,7 +436,14 @@ export function setPaper(patch: Partial<Page['paper']>) {
   S().mutate((d) => {
     const pg = curPage(d);
     const oldH = dims(pg).H;
+    const was = dims(pg);
+    if (patch.size === 'Custom' && !pg.paper.cw) Object.assign(pg.paper, { cw: was.wmm, ch: was.hmm, unit: pg.paper.unit ?? 'in' });
+    if (pg.paper.size === 'Custom' && patch.o && patch.o !== pg.paper.o && pg.paper.cw && pg.paper.ch) {
+      // A custom page turns by swapping its width and height.
+      [pg.paper.cw, pg.paper.ch] = [pg.paper.ch, pg.paper.cw];
+    }
     Object.assign(pg.paper, patch);
+    if (pg.paper.size === 'Custom' && pg.paper.cw && pg.paper.ch) pg.paper.o = pg.paper.cw > pg.paper.ch ? 'l' : 'p';
     const r = dims(pg).H / oldH;
     if (r !== 1) {
       pg.els.forEach((e) => {
@@ -446,6 +453,18 @@ export function setPaper(patch: Partial<Page['paper']>) {
       toast('Design stretched to the new paper. Press Undo to go back.');
     }
   });
+}
+
+/** Sets one side of a custom page, given in the page's unit. */
+export function setCustomSide(side: 'cw' | 'ch', value: number) {
+  const pg = curPage(S().doc);
+  const mm = value * UNIT_MM[pg.paper.unit ?? 'in'];
+  if (!(mm >= CUSTOM_MIN && mm <= CUSTOM_MAX)) {
+    toast('Pick a size between 2 cm and 1.5 m.');
+    return false;
+  }
+  setPaper({ size: 'Custom', [side]: Math.round(mm * 100) / 100 });
+  return true;
 }
 
 /* ---------- output ---------- */

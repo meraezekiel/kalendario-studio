@@ -1,4 +1,5 @@
-export type PaperKey = 'A4' | 'Letter' | 'Long' | 'Legal' | 'A5' | 'R5' | 'R4' | 'A3';
+export type PaperKey = 'A4' | 'Letter' | 'Long' | 'Legal' | 'A5' | 'R5' | 'R4' | 'A3' | 'Desk' | 'Sq3' | 'Sq6' | 'Screen' | 'Custom';
+export type SizeUnit = 'in' | 'cm' | 'mm' | 'px';
 export type Orientation = 'p' | 'l';
 export type PageRole = 'main' | 'photo' | 'cal';
 
@@ -140,7 +141,8 @@ export type ElType = El['type'];
 export interface Page {
   id: string;
   month: number;
-  paper: { size: PaperKey; o: Orientation };
+  /** `cw`/`ch` hold a custom paper's width and height in mm; `unit` is how the size is shown. */
+  paper: { size: PaperKey; o: Orientation; cw?: number; ch?: number; unit?: SizeUnit };
   bg: string;
   els: El[];
   role: PageRole;

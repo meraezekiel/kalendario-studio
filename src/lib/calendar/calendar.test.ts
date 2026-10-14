@@ -37,6 +37,12 @@ describe('dims', () => {
     expect(dims(mkPage('A4', 'l', '', [])).H).toBe(561);
     expect(dims(mkPage('Legal', 'p', '', [])).H).toBe(1308);
   });
+  it('handles square, wallpaper and custom sizes', () => {
+    expect(dims(mkPage('Sq3', 'l', '', []))).toMatchObject({ H: 794, label: 'Square 3×3 in' });
+    expect(dims(mkPage('Screen', 'l', '', [])).H).toBe(447);
+    const custom = { ...mkPage('Custom', 'p', '', []), paper: { size: 'Custom' as const, o: 'l' as const, cw: 101.6, ch: 50.8, unit: 'in' as const } };
+    expect(dims(custom)).toMatchObject({ wmm: 101.6, hmm: 50.8, H: 397, label: 'Custom 4×2 in' });
+  });
 });
 
 describe('calendarLayout', () => {

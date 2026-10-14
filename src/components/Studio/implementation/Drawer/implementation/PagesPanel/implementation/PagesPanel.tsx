@@ -6,6 +6,7 @@ import ColorField from '@/components/Fields/ColorField/implementation/ColorField
 import NumField from '@/components/Fields/NumField/implementation/NumField';
 import SegField from '@/components/Fields/SegField/implementation/SegField';
 import SelectField from '@/components/Fields/SelectField/implementation/SelectField';
+import CustomSize from './CustomSize/implementation/CustomSize';
 import { MONTH_OPTIONS, PAPER_OPTIONS, usePagesPanelHandler } from './usePagesPanelHandler';
 
 export default function PagesPanel() {
@@ -16,7 +17,8 @@ export default function PagesPanel() {
         <h3>This page</h3>
         <SelectField label="Month" value={h.page.month} options={MONTH_OPTIONS} onChange={h.setMonth} />
         <SelectField label="Paper" value={h.page.paper.size} options={PAPER_OPTIONS} onChange={h.setPaperSize} />
-        <SegField value={h.page.paper.o} options={[['p', 'Portrait'], ['l', 'Landscape']] as const} onChange={h.setOrientation} />
+        {h.page.paper.size === 'Custom' && <CustomSize />}
+        {!h.square && <SegField value={h.page.paper.o} options={[['p', 'Portrait'], ['l', 'Landscape']] as const} onChange={h.setOrientation} />}
         <ColorField label="Background color" value={h.page.bg} onChange={h.setBg} />
         <div className="g2">
           <button className="btn" onClick={h.addBlank}>Add blank page</button>

@@ -1,4 +1,4 @@
-import type { PaperKey, ShapeKind } from './types';
+import type { PaperKey, ShapeKind, SizeUnit } from './types';
 
 /** Design width of every page in CSS px. Heights follow the paper's aspect ratio. */
 export const DW = 794;
@@ -19,7 +19,18 @@ export const PAPERS: Record<PaperKey, [string, number, number]> = {
   R5: ['5R photo 5×7', 127, 177.8],
   R4: ['4R photo 4×6', 101.6, 152.4],
   A3: ['A3', 297, 420],
+  Desk: ['Desk calendar 8×5 in', 127, 203.2],
+  Sq3: ['Square 3×3 in', 76.2, 76.2],
+  Sq6: ['Square 6×6 in', 152.4, 152.4],
+  Screen: ['Desktop wallpaper 16:9 (1920×1080)', 285.75, 508],
+  Custom: ['Custom size…', 210, 297],
 };
+
+/** Millimetres per unit for custom paper sizes (px at 96 per inch). */
+export const UNIT_MM: Record<SizeUnit, number> = { in: 25.4, cm: 10, mm: 1, px: 25.4 / 96 };
+/** Smallest and largest side of a custom page, in mm. */
+export const CUSTOM_MIN = 20;
+export const CUSTOM_MAX = 1500;
 
 export const SHAPES: [ShapeKind, string][] = [
   ['rect', 'Square'], ['rounded', 'Rounded'], ['ellipse', 'Circle'], ['line', 'Line'], ['heart', 'Heart'],

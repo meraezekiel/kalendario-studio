@@ -1,15 +1,22 @@
-import { DW, MONTHS, PAPERS } from './constants';
+import { DW, MONTHS, PAPERS, UNIT_MM } from './constants';
 import { mkImage } from './factories';
 import type { CalendarDoc, ImageEl, Page, PageDims } from './types';
 import { clone, uid } from './utils';
 
 export function dims(pg: Page): PageDims {
   const p = pg.paper;
-  const [n, a, b] = PAPERS[p.size] || PAPERS.A4;
   const land = p.o === 'l';
+  if (p.size === 'Custom' && p.cw && p.ch) {
+    // Custom pages keep the exact width and height that were typed in.
+    const u = p.unit ?? 'in';
+    const show = (mm: number) => +(mm / UNIT_MM[u]).toFixed(u === 'mm' || u === 'px' ? 0 : 2);
+    return { wmm: p.cw, hmm: p.ch, W: DW, H: Math.round((DW * p.ch) / p.cw), label: `Custom ${show(p.cw)}×${show(p.ch)} ${u}` };
+  }
+  const [n, a, b] = PAPERS[p.size] || PAPERS.A4;
   const wmm = land ? Math.max(a, b) : Math.min(a, b);
   const hmm = land ? Math.min(a, b) : Math.max(a, b);
-  return { wmm, hmm, W: DW, H: Math.round((DW * hmm) / wmm), label: `${n}, ${land ? 'landscape' : 'portrait'}` };
+  const square = a === b;
+  return { wmm, hmm, W: DW, H: Math.round((DW * hmm) / wmm), label: square ? n : `${n}, ${land ? 'landscape' : 'portrait'}` };
 }
 
 /** Calendar year and month shown by a page, optionally offset by `mo` months. */

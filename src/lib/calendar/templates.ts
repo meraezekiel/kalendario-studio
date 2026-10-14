@@ -115,6 +115,33 @@ export const TEMPLATES: Record<string, Template> = {
       return [mkPage('Legal', 'p', '#ffffff', els.concat(adEls(H)))];
     },
   },
+  desk: {
+    name: 'Desk calendar 8×5 in',
+    make: () => [mkPage('Desk', 'l', '#fffaf3', [
+      holes(),
+      mkImage({ x: 24, y: 40, w: 330, h: 432, src: '@sample', radius: 10, name: 'Main photo' }),
+      mkText({ x: 376, y: 38, w: 260, h: 60, text: '{MONTH}', font: 'Fredoka', size: 40, bold: true, color: '#c76a9a', align: 'left', ls: 2, name: 'Month name' }),
+      mkText({ x: 640, y: 44, w: 130, h: 50, text: '{YEAR}', font: 'Fredoka', size: 30, bold: true, color: '#dcc8d4', align: 'right', name: 'Year' }),
+      pastelCal({ x: 376, y: 106, w: 394, h: 366, gap: 4, radius: 8 }),
+    ])],
+  },
+  wallpaper: {
+    name: 'Desktop wallpaper',
+    make: () => [mkPage('Screen', 'l', '#20263a', [
+      mkImage({ x: 0, y: 0, w: 794, h: 447, src: '@sample', isBg: true, name: 'Background' }),
+      mkShape({ shape: 'rect', x: 488, y: 34, w: 280, h: 379, radius: 16, fill: '#ffffff', op: 0.86, name: 'Calendar card' }),
+      mkText({ x: 500, y: 44, w: 256, h: 50, text: '{Month} {YEAR}', font: 'Poppins', size: 26, bold: true, color: '#20263a', name: 'Month title' }),
+      mkCal({ x: 500, y: 100, w: 256, h: 300, wkFont: 'Poppins', numFont: 'Poppins', numColor: '#20263a', wkColor: '#7a8199', lineColor: 'transparent', hiColor: '#e2557f', labels: false }),
+    ])],
+  },
+  mini3: {
+    name: 'Mini 3×3 in',
+    make: () => [mkPage('Sq3', 'p', '#fdf6fa', [
+      mkText({ x: 30, y: 26, w: 734, h: 120, text: '{MONTH}', font: 'Fredoka', size: 88, bold: true, color: '#c76a9a', ls: 4, name: 'Month name' }),
+      mkText({ x: 30, y: 136, w: 734, h: 60, text: '{YEAR}', font: 'Fredoka', size: 44, bold: true, color: '#dcc8d4', name: 'Year' }),
+      pastelCal({ x: 30, y: 214, w: 734, h: 550, labels: false }),
+    ])],
+  },
   blank: { name: 'Blank page', make: () => [mkPage('A4', 'p', '#ffffff', [])] },
 };
 

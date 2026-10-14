@@ -14,6 +14,8 @@ export function usePagesPanelHandler() {
 
   return {
     page,
+    /** Square papers have no orientation to choose. */
+    square: page.paper.size !== 'Custom' && PAPERS[page.paper.size][1] === PAPERS[page.paper.size][2],
     year,
     showHolidays,
     setMonth: (m: number) => mutate((d) => void (curPage(d).month = m), { key: `pg:${page.id}:month` }),
