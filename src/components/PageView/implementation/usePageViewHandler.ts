@@ -1,13 +1,14 @@
 import { useMemo } from 'react';
 import { dims } from '@/lib/calendar/document';
 import type { RenderCtx } from '@/lib/calendar/render';
-import type { Page } from '@/lib/calendar/types';
+import type { Asset, Page } from '@/lib/calendar/types';
 import { useStudioStore } from '@/store/useStudioStore';
 
-export function usePageViewHandler(page: Page, edit: boolean) {
+export function usePageViewHandler(page: Page, edit: boolean, own?: Record<string, Asset>) {
   const year = useStudioStore((s) => s.doc.year);
   const holidays = useStudioStore((s) => s.doc.holidays);
-  const assets = useStudioStore((s) => s.doc.assets);
+  const docAssets = useStudioStore((s) => s.doc.assets);
+  const assets = own ?? docAssets;
   const armed = useStudioStore((s) => (edit ? s.armed : null));
   const sel = useStudioStore((s) => (edit ? s.sel : null));
   const selDay = useStudioStore((s) => (edit ? s.selDay : null));

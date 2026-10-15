@@ -228,3 +228,17 @@ html,body{margin:0}
 .moon-sm{position:absolute;top:3px;right:3px;z-index:1;line-height:0}
 .evs-year .ev i{min-width:3.6em;flex:none}
 .evs-year .ev{line-height:1.25}
+/* modal */
+.modal-back{position:fixed;inset:0;z-index:200;background:rgba(20,16,26,.45);display:grid;place-items:center;padding:16px}
+.modal{width:380px;max-width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;box-shadow:0 18px 50px rgba(0,0,0,.25)}
+.modal h2{margin:0 0 8px;font-size:16px}
+.modal-body{font-size:13px;line-height:1.5;color:var(--ink)}
+.modal-body p{margin:0 0 10px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.btn.solid-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+/* my templates */
+.mytpl{position:relative;display:flex}
+.mytpl>.tpl{flex:1;min-width:0}
+.tpl-del{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--danger);font-size:15px;line-height:1;cursor:pointer;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.tpl-del:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
+.tpl-del:focus-visible{outline:2px solid var(--sel);outline-offset:2px}

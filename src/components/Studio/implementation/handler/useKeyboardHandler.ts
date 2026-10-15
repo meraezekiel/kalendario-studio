@@ -8,6 +8,8 @@ const NUDGE: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight
 export function useKeyboardHandler() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // An open dialog has the keyboard; editor shortcuts wait until it closes.
+      if (document.querySelector('.modal')) return;
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
         const key = e.key.toLowerCase();
         if (key === 's') { e.preventDefault(); return saveDesignFile(); }
