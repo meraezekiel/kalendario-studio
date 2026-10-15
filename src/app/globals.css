@@ -186,6 +186,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .sheetp{overflow:hidden;break-after:page;page-break-after:always}
   .sheetp:last-child{break-after:auto;page-break-after:auto}
 }
+.sheetp{position:relative;background:#fff}
+.slotp{position:absolute;overflow:hidden}
+.sheetprev{position:relative;margin:4px auto 0;background:#fff;border:1px solid var(--line);border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.sheetprev i{position:absolute;background:color-mix(in srgb,var(--accent) 22%,#fff);outline:1px solid color-mix(in srgb,var(--accent) 55%,#fff)}
+.sheetprev b{position:absolute;background:#222}
+.cutmark{position:absolute;background:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* ================= Additions for the Next.js build ================= */

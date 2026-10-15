@@ -147,6 +147,66 @@ export const TEMPLATES: Record<string, Template> = {
       ])];
     },
   },
+  business2: {
+    name: 'Business · 2 months',
+    make: () => {
+      const red = '#e3212b', navy = '#1f2a6b';
+      const branch = (x: number, name: string, lines: string) => [
+        mkText({ x, y: 196, w: 236, h: 30, text: name, font: 'Archivo Black', size: 17, color: red, name: `${name[0]}${name.slice(1).toLowerCase()}` }),
+        mkText({ x, y: 226, w: 236, h: 84, text: lines, font: 'Poppins', size: 10.5, bold: true, color: red, lh: 1.35, valign: 'top', name: `${name[0]}${name.slice(1).toLowerCase()} details` }),
+      ];
+      // "9 | SEPTEMBER | 2026" bar above each big month; `o` is the month offset (0 or 1).
+      const banner = (o: number, x: number, y: number, w: number): El[] => {
+        const t = (s: string) => (o ? s.replace('}', `+${o}}`) : s);
+        return [
+          mkShape({ shape: 'rect', x, y: y + 8, w, h: 42, fill: navy, name: 'Month bar' }),
+          mkShape({ shape: 'rect', x: x + 6, y: y + 11, w: 42, h: 36, radius: 3, fill: '#ffffff', stroke: navy, sw: 2, name: 'Month number box' }),
+          mkText({ x: x + 6, y: y + 11, w: 42, h: 36, text: t('{NUM}'), font: 'Archivo Black', size: 24, color: navy, name: 'Month number' }),
+          mkShape({ shape: 'rect', x: x + 56, y: y + 11, w: w - 214, h: 36, radius: 18, fill: '#ffffff', name: 'Month name box' }),
+          mkText({ x: x + 56, y: y + 9, w: w - 214, h: 40, text: t('{MONTH}'), font: 'Archivo Black', size: 30, color: red, ls: 3, name: 'Month name' }),
+          mkText({ x: x + w - 152, y: y - 4, w: 148, h: 58, text: t('{YEAR}'), font: 'Anton', size: 50, color: red, outline: 2, outlineColor: '#ffffff', ls: 1, name: 'Year' }),
+        ];
+      };
+      const big = (mo: number, x: number, y: number, w: number, h: number) => mkCal({
+        mo, x, y, w, h, moon: true, wkFont: 'Archivo Black', wkColor: navy, numFont: 'Archivo Black', numColor: navy, numScale: 1.1,
+        hiColor: red, labels: false, lineColor: '#8b93ad', border: 1.5, borderColor: navy, name: mo ? 'Second month' : 'First month',
+      });
+      const side = (mo: number, x: number, y: number) => mkCal({
+        mo, side: true, x, y, w: 236, h: 204, head: true, headText: '{NUM}|{MONTH}|{YEAR}', headFont: 'Archivo Black', headBg: '', headColor: red, headScale: 1.05,
+        wkFont: 'Archivo Black', wkColor: navy, numFont: 'Archivo Black', numColor: navy, hiColor: red, labels: false, lines: false,
+        border: 1.5, borderColor: navy, name: mo < 0 ? 'Previous month' : 'Month after',
+      });
+      const memoLines = Array.from({ length: 8 }, (_, i) =>
+        mkShape({ shape: 'rect', x: 42, y: 594 + i * 21, w: 204, h: 1, fill: '#9aa0ad', name: 'Memo line' }));
+      return [mkPage('Long', 'p', '#ffffff', [
+        mkShape({ shape: 'rect', x: 20, y: 14, w: 754, h: 300, fill: 'transparent', stroke: red, sw: 3, name: 'Header border' }),
+        mkShape({ shape: 'rect', x: 27, y: 21, w: 740, h: 286, fill: 'transparent', stroke: red, sw: 1, name: 'Header inner border' }),
+        mkText({ x: 60, y: 32, w: 674, h: 34, text: 'Authorized Dealer of Your Brand', font: 'Playfair Display', size: 22, bold: true, color: red, name: 'Tagline' }),
+        mkImage({ x: 40, y: 72, w: 96, h: 96, radius: 50, fit: 'contain', name: 'Logo' }),
+        mkText({ x: 140, y: 64, w: 520, h: 108, text: 'BITUIN MOTORS, INC.', font: 'Anton', size: 60, color: red, name: 'Business name' }),
+        mkImage({ x: 666, y: 82, w: 92, h: 80, fit: 'contain', name: 'Brand logo' }),
+        mkShape({ shape: 'rect', x: 150, y: 176, w: 494, h: 2, fill: red, name: 'Red line' }),
+        ...branch(34, 'MAIN BRANCH', '123 Rizal St., Poblacion, Your City\nSALES: (033) 123-4567\nPARTS: (033) 123-4568\nSERVICE: (033) 123-4569\nMOBILE: 0912 345 6789'),
+        ...branch(279, 'NORTH BRANCH', 'National Highway, Your Town\nSALES: (034) 123-4567\nPARTS: (034) 123-4568\nSERVICE: (034) 123-4569\nMOBILE: 0917 345 6789'),
+        ...branch(524, 'SOUTH BRANCH', 'Km. 1, Your Town\nSALES: (036) 123-4567\nPARTS: (036) 123-4568\nSERVICE: (036) 123-4569\nMOBILE: 0998 345 6789'),
+        // Top row: previous month and memo on the left, first month on the right.
+        side(-1, 22, 324),
+        mkShape({ shape: 'rect', x: 22, y: 540, w: 236, h: 230, radius: 6, fill: 'transparent', stroke: navy, sw: 1.5, name: 'Memo box' }),
+        mkText({ x: 22, y: 552, w: 236, h: 24, text: 'MEMORANDUM', font: 'Poppins', size: 12, bold: true, color: '#333333', ls: 3, name: 'Memo title' }),
+        ...memoLines,
+        ...banner(0, 268, 318, 504),
+        big(0, 268, 370, 504, 400),
+        // Bottom row: second month on the left, month after and holidays on the right.
+        ...banner(1, 22, 780, 504),
+        big(1, 22, 832, 504, 352),
+        side(2, 536, 786),
+        mkShape({ shape: 'rect', x: 536, y: 1000, w: 236, h: 184, radius: 6, fill: 'transparent', stroke: navy, sw: 1.5, name: 'Holiday box' }),
+        mkText({ x: 536, y: 1003, w: 236, h: 26, text: 'Legal Holidays', font: 'Playfair Display', size: 17, bold: true, italic: true, color: red, name: 'Holidays title' }),
+        mkEvents({ scope: 'year', regular: true, title: false, x: 544, y: 1032, w: 222, h: 148, size: 9.5, cols: 1, color: navy, hiColor: red, name: 'Holidays' }),
+        mkText({ x: 22, y: 1188, w: 750, h: 20, text: 'Red days are Sundays and holidays • Moon phases in Philippine time • Not responsible for typographical errors', font: 'Poppins', size: 8.5, bold: true, upper: true, color: navy, name: 'Footnote' }),
+      ])];
+    },
+  },
   desk: {
     name: 'Desk calendar 8×5 in',
     make: () => [mkPage('Desk', 'l', '#fffaf3', [

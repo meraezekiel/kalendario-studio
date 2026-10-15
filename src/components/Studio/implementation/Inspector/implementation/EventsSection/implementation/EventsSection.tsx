@@ -15,9 +15,10 @@ export default function EventsSection({ el }: { el: EventsEl }) {
   return (
     <Section title="Holiday list">
       <SegField label="Show" options={[['month', 'This month'], ['year', 'Whole year']] as const} value={el.scope ?? 'month'} onChange={(v) => bind('scope').onChange(v)} />
+      {el.scope === 'year' && <CheckField label="Regular holidays only" value={!!el.regular} onChange={(v) => bind('regular').onChange(v)} />}
       {el.scope !== 'year' && <SelectField label="Month" options={moOptions} {...bind('mo')} />}
       <p className="hint" style={{ margin: '-4px 0 10px' }}>
-        {el.scope === 'year' ? 'Lists every Philippine holiday of the year.' : 'Lists Philippine holidays plus the labels you add to days in the matching calendar.'}
+        {el.scope === 'year' ? (el.regular ? 'Lists the regular Philippine holidays of the year.' : 'Lists every Philippine holiday of the year.') : 'Lists Philippine holidays plus the labels you add to days in the matching calendar.'}
       </p>
       <FontField label="Font" {...bind('font')} />
       <div className="g2">

@@ -7,6 +7,7 @@ import NumField from '@/components/Fields/NumField/implementation/NumField';
 import SegField from '@/components/Fields/SegField/implementation/SegField';
 import SelectField from '@/components/Fields/SelectField/implementation/SelectField';
 import CustomSize from './CustomSize/implementation/CustomSize';
+import SheetSection from './SheetSection/implementation/SheetSection';
 import { MONTH_OPTIONS, PAPER_OPTIONS, usePagesPanelHandler } from './usePagesPanelHandler';
 
 export default function PagesPanel() {
@@ -39,6 +40,7 @@ export default function PagesPanel() {
           Fill the rest of the year makes one copy per month and replaces the other pages. Copy design keeps each month&apos;s own photos and day details. Pages marked photo only copy to other photo pages. Backgrounds for each month puts the images you pick into the background of this page and the ones after it, in file-name order (01-jan, 02-feb, …).
         </p>
       </section>
+      <SheetSection />
       <section data-testid="design-file">
         <h3>Design file</h3>
         <div className="g2">

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { calendarLayout } from './calendarLayout';
 import { assetInUse, dims, ensureBackground, makeYear, migrateDoc, monthOf, syncDesign, tok } from './document';
 import { mkCal, mkImage, mkPage, mkText } from './factories';
-import { easter, holidays } from './holidays';
+import { easter, holidays, regularOnly } from './holidays';
 import { TEMPLATES } from './templates';
 import type { CalendarDoc } from './types';
 
@@ -118,3 +118,19 @@ describe('makeYear / syncDesign', () => {
     expect('bgImg' in d.pages[0]).toBe(false);
     expect(assetInUse(d, 'a1')).toBe(true);
   });});
+
+describe('regular holidays', () => {
+  it('keeps the 10 regular holidays of a year and drops special days', () => {
+    const names = Array.from({ length: 12 }, (_, m) => Object.values(holidays(2026, m)).map(regularOnly).filter(Boolean)).flat();
+    expect(names).toHaveLength(10);
+    expect(names).toContain('Maundy Thursday');
+    expect(names).not.toContain('EDSA Anniversary');
+    expect(regularOnly('Ninoy Aquino Day · National Heroes Day')).toBe('National Heroes Day');
+  });
+
+  it('two-month business template fills a year in 6 pages', () => {
+    const doc = docWith(TEMPLATES.business2.make());
+    expect(makeYear(doc)).toBe(6);
+    expect(doc.pages.map((p) => p.month)).toEqual([0, 2, 4, 6, 8, 10]);
+  });
+});

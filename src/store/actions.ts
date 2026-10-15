@@ -8,9 +8,10 @@ import { findGraphic } from '@/lib/graphics/library';
 import { rememberGraphic } from '@/lib/graphics/recent';
 import { readImage } from '@/lib/calendar/samplePhoto';
 import { designFileName, DESIGN_EXT, parseDesign, serializeDesign } from '@/lib/calendar/designFile';
+import { DEFAULT_SHEET, sheetLayout } from '@/lib/calendar/sheet';
 import { giveCal, TEMPLATES } from '@/lib/calendar/templates';
 import { markThanksSeen, thanksSeen } from '@/lib/support/support';
-import type { CalEl, El, Page, ShapeEl, ShapeKind } from '@/lib/calendar/types';
+import type { CalEl, El, Page, ShapeEl, ShapeKind, SheetSettings } from '@/lib/calendar/types';
 import { clamp, clone, uid } from '@/lib/calendar/utils';
 import { curPage, findEl, type PickTarget, selIds, toast, useStudioStore } from './useStudioStore';
 
@@ -475,11 +476,28 @@ export function setCustomSide(side: 'cw' | 'ch', value: number) {
 export function printPages(all: boolean) {
   const { doc } = S();
   const pg = curPage(doc);
+  sheetNote(pg, doc.sheet, all);
   if (!all) return S().set({ printing: [doc.cur] });
   const key = JSON.stringify(pg.paper);
   const idx = doc.pages.map((p, i) => (JSON.stringify(p.paper) === key ? i : -1)).filter((i) => i >= 0);
   if (idx.length < doc.pages.length) toast(`Printing the ${idx.length} pages that use ${dims(pg).label}. Go to a page with the other paper size and print again for the rest.`);
   S().set({ printing: idx });
+}
+
+/** Says how many pages go on each sheet, or why they can't share one. */
+function sheetNote(pg: Page, sheet: SheetSettings | undefined, all: boolean) {
+  if (!sheet?.on) return;
+  const L = sheetLayout(dims(pg), sheet);
+  const name = sheet.paper === 'Long' ? 'long bond' : sheet.paper;
+  if (!L) return toast(`This page is too big for ${name} paper, so it prints one per page.`);
+  const marks = sheet.marks ? ' with cut marks' : '';
+  if (!sheet.fill && !all) return toast(`Printing this page on ${name} paper${marks}. Turn on "Fill the sheet with copies" for ${L.per} per sheet.`);
+  toast(`Printing ${L.per} per ${name} sheet${sheet.fill ? ' (copies of each page)' : ''}${marks}. Set the printer to 100% / Actual size.`);
+}
+
+/** Changes the several-per-sheet print settings. */
+export function setSheet(patch: Partial<SheetSettings>) {
+  S().mutate((d) => void (d.sheet = { ...DEFAULT_SHEET, ...d.sheet, ...patch }));
 }
 
 /* ---------- design files ---------- */

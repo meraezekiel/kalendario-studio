@@ -50,6 +50,45 @@ test.describe('Classic business calendar', () => {
     expect(errors).toEqual([]);
   });
 
+  test('two months per page: banners, side months, memo and legal holidays', async ({ page }) => {
+    const errors = await openStudio(page);
+    await chooseTemplate(page, 'Business · 2 months');
+    await expect(page.getByTestId('page-label')).toHaveText(/Page 1 of 6 · January/);
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    await page.locator('.drawer').getByLabel('Year', { exact: true }).fill('2026');
+    for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Next page' }).click();
+    await expect(page.getByTestId('page-label')).toHaveText(/Page 5 of 6 · September/);
+
+    const ph = page.locator('.ph .page');
+    for (const t of ['9', 'SEPTEMBER', '10', 'OCTOBER']) await expect(ph.locator('.tx', { hasText: new RegExp(`^${t}$`) })).toBeVisible();
+    await expect(ph.locator('.tx', { hasText: /^2026$/ })).toHaveCount(2);
+    // August and November on the side, with their month numbers.
+    await expect(ph.locator('.el-cal .chead', { hasText: 'AUGUST' })).toContainText('8');
+    await expect(ph.locator('.el-cal .chead', { hasText: 'NOVEMBER' })).toContainText('11');
+    // Both big months show their moon phases.
+    const cals = ph.locator('.el-cal');
+    await expect(cals).toHaveCount(4);
+    const oct = ph.locator('.el', { has: page.locator('.cell[data-day="31"]') }).filter({ hasNot: page.locator('.chead') }).last();
+    await expect(oct.locator('.moon i')).toHaveText(['OCT. 3', 'OCT. 10', 'OCT. 19', 'OCT. 26']);
+    await expect(ph.locator('.tx', { hasText: 'MEMORANDUM' })).toBeVisible();
+    const list = ph.locator('.evs-year');
+    await expect(list.locator('.ev', { hasText: 'Rizal Day' })).toContainText('Dec 30');
+    // Like the printed "Legal Holidays" box: the 10 regular holidays, no special days.
+    await expect(list.locator('.ev')).toHaveCount(10);
+    await expect(list.locator('.ev', { hasText: 'National Heroes Day' })).toContainText('Aug 31');
+    await expect(list.locator('.ev', { hasText: 'EDSA' })).toHaveCount(0);
+    // The whole holiday list fits in its box.
+    const fits = await list.evaluate((e) => e.scrollHeight <= e.clientHeight + 1);
+    expect(fits).toBe(true);
+    await page.screenshot({ path: 'e2e/shots/38-business2.png' });
+
+    // The last page is November and December, with January of the next year on the side.
+    await page.getByRole('button', { name: 'Next page' }).click();
+    await expect(page.getByTestId('page-label')).toHaveText(/Page 6 of 6 · November/);
+    await expect(ph.locator('.el-cal .chead', { hasText: 'JANUARY' })).toContainText('2027');
+    expect(errors).toEqual([]);
+  });
+
   test('slanted bar is in the shape list', async ({ page }) => {
     await openStudio(page);
     await page.getByRole('button', { name: 'Add', exact: true }).click();

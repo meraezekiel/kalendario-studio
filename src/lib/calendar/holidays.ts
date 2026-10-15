@@ -15,6 +15,12 @@ const FIXED: Record<string, string> = {
   '11-30': 'Rizal Day', '11-31': "New Year's Eve",
 };
 
+/** Regular holidays (RA 9492); the rest are special non-working days. */
+const REGULAR = new Set(["New Year's Day", 'Maundy Thursday', 'Good Friday', 'Araw ng Kagitingan', 'Labor Day', 'Independence Day', 'National Heroes Day', 'Bonifacio Day', 'Christmas Day', 'Rizal Day']);
+
+/** Keeps only the regular holidays of a holiday name like "A · B"; empty when none are regular. */
+export const regularOnly = (name: string) => name.split(' · ').filter((n) => REGULAR.has(n)).join(' · ');
+
 const cache: Record<string, Record<number, string>> = {};
 
 /** Holidays for month `m` (0-11) of year `y`, keyed by day of month. */

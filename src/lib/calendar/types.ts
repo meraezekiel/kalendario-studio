@@ -126,6 +126,8 @@ export interface EventsEl extends BaseEl {
   cols: number;
   /** 'year' lists every holiday of the year instead of one month's. */
   scope?: 'month' | 'year';
+  /** Whole-year list only: regular holidays, without the special non-working days. */
+  regular?: boolean;
 }
 
 /** A ready-made illustration or gradient from the Graphics library. */
@@ -160,6 +162,19 @@ export interface Asset {
   h: number;
 }
 
+/** Sheets that several small pages are printed on, then cut apart. */
+export type SheetPaper = 'A4' | 'Letter' | 'Long' | 'Legal' | 'A3';
+
+export interface SheetSettings {
+  on: boolean;
+  paper: SheetPaper;
+  /** Space between pages, in mm. 0 means neighbours share one cut. */
+  gap: number;
+  marks: boolean;
+  /** true = fill each sheet with copies of one page; false = pages one after another. */
+  fill: boolean;
+}
+
 export interface CalendarDoc {
   v: 3;
   year: number;
@@ -168,6 +183,8 @@ export interface CalendarDoc {
   assets: Record<string, Asset>;
   tray: string[];
   pages: Page[];
+  /** Print several pages per sheet with cut marks; off when missing. */
+  sheet?: SheetSettings;
 }
 
 export interface PageDims {
