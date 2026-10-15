@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
-import { getSupport } from '@/lib/support/support';
+import { getSupport, hasSupport } from '@/lib/support/support';
+import { saveDesignFile } from '@/store/actions';
 import { useStudioStore } from '@/store/useStudioStore';
 
 /** How long the note stays before it hides by itself. */
@@ -18,7 +19,12 @@ export function useThanksNoteHandler() {
 
   return {
     open,
+    support: hasSupport(support),
     coffeeUrl: support.coffeeUrl,
+    save: () => {
+      saveDesignFile();
+      close();
+    },
     hasLinks: support.links.length > 0,
     close,
     showSupplies: () => {

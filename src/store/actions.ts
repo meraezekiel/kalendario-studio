@@ -7,8 +7,9 @@ import { DECOS } from '@/lib/graphics/deco';
 import { findGraphic } from '@/lib/graphics/library';
 import { rememberGraphic } from '@/lib/graphics/recent';
 import { readImage } from '@/lib/calendar/samplePhoto';
+import { designFileName, DESIGN_EXT, parseDesign, serializeDesign } from '@/lib/calendar/designFile';
 import { giveCal, TEMPLATES } from '@/lib/calendar/templates';
-import { hasSupport, markThanksSeen, thanksSeen } from '@/lib/support/support';
+import { markThanksSeen, thanksSeen } from '@/lib/support/support';
 import type { CalEl, El, Page, ShapeEl, ShapeKind } from '@/lib/calendar/types';
 import { clamp, clone, uid } from '@/lib/calendar/utils';
 import { curPage, findEl, type PickTarget, selIds, toast, useStudioStore } from './useStudioStore';
@@ -480,12 +481,61 @@ export function printPages(all: boolean) {
   S().set({ printing: idx });
 }
 
+/* ---------- design files ---------- */
+
+/** Downloads the whole calendar, photos included, as one file to keep or move to another computer. */
+export function saveDesignFile() {
+  const { doc } = S();
+  const url = URL.createObjectURL(new Blob([serializeDesign(doc)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = designFileName(doc);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  keepStorage();
+  toast(`Saved ${a.download}. Keep it somewhere safe, like Google Drive.`);
+}
+
+/** Opens a design file in place of the current calendar. Undo brings the previous one back. */
+export function openDesignFile() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = `${DESIGN_EXT},.json,application/json`;
+  inp.style.display = 'none';
+  inp.addEventListener('change', async () => {
+    const file = inp.files?.[0];
+    inp.remove();
+    if (!file) return;
+    try {
+      const next = parseDesign(await file.text());
+      S().select(null);
+      S().mutate((d) => void Object.assign(d, next));
+      toast(`Opened ${file.name} (${next.pages.length} page${next.pages.length > 1 ? 's' : ''}). Press Undo to go back to your previous design.`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not open that file.');
+    }
+  });
+  document.body.appendChild(inp);
+  inp.click();
+}
+
+let storageAsked = false;
+/** Asks the browser not to clear this site's saved design when disk space runs low. */
+function keepStorage() {
+  if (storageAsked) return;
+  storageAsked = true;
+  navigator.storage?.persist?.().catch(() => undefined);
+}
+
 /** Slightly longer than a toast stays on screen. */
 const THANKS_DELAY_MS = 3900;
 
 /** After the first finished export or print, shows a small thank-you note once per browser. */
 export function offerThanks() {
-  if (!hasSupport() || thanksSeen()) return;
+  keepStorage();
+  if (thanksSeen()) return;
   markThanksSeen();
   // Waits for the "saved" message to fade so the two never overlap.
   setTimeout(() => S().set({ thanks: true }), THANKS_DELAY_MS);

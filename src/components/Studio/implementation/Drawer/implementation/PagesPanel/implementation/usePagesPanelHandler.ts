@@ -1,6 +1,6 @@
 import { MONTHS, PAPERS } from '@/lib/calendar/constants';
 import type { PaperKey } from '@/lib/calendar/types';
-import { addPage, applyDesignToAll, deletePage, fillYear, movePage, pickMonthBackgrounds, setPaper } from '@/store/actions';
+import { addPage, applyDesignToAll, deletePage, fillYear, movePage, openDesignFile, pickMonthBackgrounds, saveDesignFile, setPaper } from '@/store/actions';
 import { curPage, useStudioStore } from '@/store/useStudioStore';
 
 export const MONTH_OPTIONS = MONTHS.map((m, i) => [i, m] as const);
@@ -34,5 +34,7 @@ export function usePagesPanelHandler() {
     fillYear,
     applyDesignToAll,
     monthBackgrounds: pickMonthBackgrounds,
+    saveFile: saveDesignFile,
+    openFile: openDesignFile,
   };
 }

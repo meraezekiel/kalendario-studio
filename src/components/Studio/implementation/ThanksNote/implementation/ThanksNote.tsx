@@ -10,11 +10,19 @@ export default function ThanksNote() {
     <aside className="thanks" role="status" data-testid="thanks-note">
       <button className="thanks-x" aria-label="Close" onClick={h.close}>✕</button>
       <b>Your calendar is ready 🎉</b>
-      <p>This is a free hobby project. If it helped, you can support it. Totally optional.</p>
+      <p>Want the same design next year? Save a design file and keep it somewhere safe.</p>
       <div className="thanks-acts">
-        {h.coffeeUrl && <a className="btn coffee" href={h.coffeeUrl} target="_blank" rel="noopener noreferrer" onClick={h.close}>☕ Buy me a coffee</a>}
-        {h.hasLinks && <button className="btn" onClick={h.showSupplies}>Print supplies</button>}
+        <button className="btn primary" onClick={h.save}>Save design file</button>
       </div>
+      {h.support && (
+        <>
+          <p>This is a free hobby project. If it helped, you can support it. Totally optional.</p>
+          <div className="thanks-acts">
+            {h.coffeeUrl && <a className="btn coffee" href={h.coffeeUrl} target="_blank" rel="noopener noreferrer" onClick={h.close}>☕ Buy me a coffee</a>}
+            {h.hasLinks && <button className="btn" onClick={h.showSupplies}>Print supplies</button>}
+          </div>
+        </>
+      )}
     </aside>
   );
 }

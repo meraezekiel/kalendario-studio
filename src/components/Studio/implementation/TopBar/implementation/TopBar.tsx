@@ -10,6 +10,12 @@ export default function TopBar() {
       <div className="brand">Kalendaryo Studio</div>
       <button className="btn icon" onClick={h.undo} disabled={!h.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
       <button className="btn icon" onClick={h.redo} disabled={!h.canRedo} title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
+      {!h.framed && (
+        <>
+          <button className="btn filebtn" onClick={h.saveFile} title="Save your design (photos included) as a file to keep for next year (Ctrl+S)">Save file</button>
+          <button className="btn filebtn" onClick={h.openFile} title="Open a saved design file (Ctrl+O)">Open file</button>
+        </>
+      )}
       <div className="grow" />
       <div className="pnav">
         <button className="btn icon" onClick={h.prev} aria-label="Previous page">‹</button>

@@ -1,11 +1,8 @@
 import { useEffect } from 'react';
 import { get, set } from 'idb-keyval';
+import { isDoc } from '@/lib/calendar/designFile';
 import { migrateDoc } from '@/lib/calendar/document';
-import type { CalendarDoc } from '@/lib/calendar/types';
 import { STORAGE_KEY, toast, useStudioStore } from '@/store/useStudioStore';
-
-const isDoc = (d: unknown): d is CalendarDoc =>
-  !!d && typeof d === 'object' && (d as CalendarDoc).v === 3 && Array.isArray((d as CalendarDoc).pages) && (d as CalendarDoc).pages.length > 0;
 
 /** Loads the saved calendar from IndexedDB on start, then autosaves every change (debounced). */
 export function usePersistenceHandler() {

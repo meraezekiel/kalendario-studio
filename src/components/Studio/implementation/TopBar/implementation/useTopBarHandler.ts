@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { MONTHS } from '@/lib/calendar/constants';
 import { monthOf } from '@/lib/calendar/document';
-import { applyDesignToAll, exportPNG, goToPage, printPages } from '@/store/actions';
+import { applyDesignToAll, exportPNG, goToPage, openDesignFile, printPages, saveDesignFile } from '@/store/actions';
 import { curPage, useStudioStore } from '@/store/useStudioStore';
 
 /** Inside a frame (e.g. an embedded preview) printing and downloads are usually blocked. */
@@ -27,6 +27,8 @@ export function useTopBarHandler() {
   const st = useStudioStore.getState;
   return {
     framed,
+    saveFile: saveDesignFile,
+    openFile: openDesignFile,
     label,
     canUndo,
     canRedo,

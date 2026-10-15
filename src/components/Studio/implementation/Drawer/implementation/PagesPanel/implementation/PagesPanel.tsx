@@ -39,6 +39,16 @@ export default function PagesPanel() {
           Fill the rest of the year makes one copy per month and replaces the other pages. Copy design keeps each month&apos;s own photos and day details. Pages marked photo only copy to other photo pages. Backgrounds for each month puts the images you pick into the background of this page and the ones after it, in file-name order (01-jan, 02-feb, …).
         </p>
       </section>
+      <section data-testid="design-file">
+        <h3>Design file</h3>
+        <div className="g2">
+          <button className="btn primary" onClick={h.saveFile} title="Ctrl+S">Save design file</button>
+          <button className="btn" onClick={h.openFile} title="Ctrl+O">Open design file</button>
+        </div>
+        <p className="hint" style={{ marginTop: 8 }}>
+          Your design autosaves in this browser only. Save a design file (photos included) to keep it for next year, back it up in Google Drive, or open it on another computer. Next year, open it and change the Year above.
+        </p>
+      </section>
     </>
   );
 }

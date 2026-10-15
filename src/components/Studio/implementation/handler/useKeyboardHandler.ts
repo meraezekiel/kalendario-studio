@@ -1,13 +1,18 @@
 import { useEffect } from 'react';
-import { copySelected, deleteSelected, duplicate, nudge, selectAll, selectedEls } from '@/store/actions';
+import { copySelected, deleteSelected, duplicate, nudge, openDesignFile, saveDesignFile, selectAll, selectedEls } from '@/store/actions';
 import { useStudioStore } from '@/store/useStudioStore';
 
 const NUDGE: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
-/** Global shortcuts: undo/redo, select all, copy/paste/duplicate, delete, arrow nudging, Esc. All act on the whole selection. */
+/** Global shortcuts: save/open design file, undo/redo, select all, copy/paste/duplicate, delete, arrow nudging, Esc. All act on the whole selection. */
 export function useKeyboardHandler() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === 's') { e.preventDefault(); return saveDesignFile(); }
+        if (key === 'o') { e.preventDefault(); return openDesignFile(); }
+      }
       const a = document.activeElement as HTMLElement | null;
       if (a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable)) return;
       const st = useStudioStore.getState();

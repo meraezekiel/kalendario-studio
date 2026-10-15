@@ -64,12 +64,18 @@ test.describe('Support', () => {
     await expect(page.getByTestId('supply-links')).toBeVisible();
   });
 
-  test('with nothing configured there is no Support tab and no note', async ({ page }) => {
+  test('with nothing configured there is no Support tab and the note only offers to save', async ({ page }) => {
     await preview(page, { coffeeUrl: '', links: [] });
     await openStudio(page);
     await expect(page.getByRole('button', { name: 'Support' })).toHaveCount(0);
     await exportPng(page);
-    await page.waitForTimeout(4500); // longer than the note's delay
-    await expect(page.getByTestId('thanks-note')).toHaveCount(0);
+    const note = page.getByTestId('thanks-note');
+    await expect(note).toBeVisible();
+    await expect(note.getByRole('link')).toHaveCount(0);
+    await expect(note.getByRole('button', { name: 'Print supplies' })).toHaveCount(0);
+    const dl = page.waitForEvent('download');
+    await note.getByRole('button', { name: 'Save design file' }).click();
+    expect((await dl).suggestedFilename()).toMatch(/\.kalendaryo$/);
+    await expect(note).toHaveCount(0);
   });
 });
