@@ -1,10 +1,12 @@
 import type { CSSProperties } from 'react';
 import { calendarLayout } from '@/lib/calendar/calendarLayout';
-import { PILLS } from '@/lib/calendar/constants';
+import { MONTHS, PILLS } from '@/lib/calendar/constants';
 import { monthOf, tok } from '@/lib/calendar/document';
 import { holidays } from '@/lib/calendar/holidays';
+import { MOON_NAMES, type MoonPhase, moonPhases } from '@/lib/calendar/moon';
 import type { RenderCtx } from '@/lib/calendar/render';
 import type { CalEl, Page } from '@/lib/calendar/types';
+import { r1 } from '@/lib/calendar/utils';
 
 export interface CellView {
   key: number;
@@ -16,6 +18,18 @@ export interface CellView {
   label: string;
   labelStyle: CSSProperties;
   img: string | null;
+  moon?: MoonView;
+}
+
+export interface MoonView {
+  phase: MoonPhase;
+  /** Big = fills an empty box with name and date; small = an icon in the corner of its day. */
+  big: boolean;
+  name: string;
+  date: string;
+  size: number;
+  color: string;
+  textSize: number;
 }
 
 const H_ALIGN = { left: 'flex-start', center: 'center', right: 'flex-end' } as const;
@@ -23,7 +37,8 @@ const NUM_POS = { center: ['center', 'center'], tl: ['flex-start', 'flex-start']
 
 export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx, selDay: number | null) {
   const { y, m } = monthOf(ctx.year, page, el.mo);
-  const hol = ctx.holidays && el.labels ? holidays(y, m) : {};
+  // Holidays always colour their day; `labels` only decides whether the name is written in the box.
+  const hol = ctx.holidays ? holidays(y, m) : {};
   const L = calendarLayout(el, y, m);
   const g = L.gap;
 
@@ -76,6 +91,23 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
   const pad = el.numPos === 'center' ? '0' : `${Math.round(L.ch * 0.08)}px ${Math.round(L.cw * 0.1)}px`;
   const numBase: CSSProperties = { fontFamily: `'${el.numFont}',sans-serif`, fontSize: L.numSize, fontWeight: el.numBold ? 700 : 400 };
 
+  // Moon phases go into the empty boxes in order; any that don't fit mark their own day instead.
+  const phases = el.moon ? moonPhases(y, m) : [];
+  const empty = el.adjacent || L.ch < 40 || L.cw < 40 ? [] : L.cells.flatMap((c, i) => (c.day == null ? [i] : []));
+  const bigAt = new Map<number, (typeof phases)[number]>();
+  const smallOn = new Map<number, MoonPhase>();
+  phases.forEach((p, i) => (i < empty.length ? bigAt.set(empty[i], p) : smallOn.set(p.day, p.phase)));
+  const mon = MONTHS[m].slice(0, 3).toUpperCase();
+  const moonText = r1(Math.max(5, Math.min(L.labelSize * 1.1, L.cw * 0.11)));
+  const bigMoon = (p: (typeof phases)[number]): MoonView => ({
+    phase: p.phase, big: true, name: MOON_NAMES[p.phase], date: `${mon}. ${p.day}`,
+    size: Math.round(Math.min(L.cw, L.ch) * 0.46), color: el.hiColor, textSize: moonText,
+  });
+  const smallMoon = (phase: MoonPhase, day: number): MoonView => ({
+    phase, big: false, name: MOON_NAMES[phase], date: `${mon}. ${day}`,
+    size: Math.max(8, Math.round(Math.min(L.cw, L.ch) * 0.22)), color: el.hiColor, textSize: moonText,
+  });
+
   const cells: CellView[] = L.cells.map((c, i) => {
     const bord: CSSProperties = ln
       ? { borderBottom: `1px solid ${lc}`, borderRight: c.col < 6 ? `1px solid ${lc}` : undefined }
@@ -87,13 +119,14 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
       if (el.adjacent) {
         return { key: i, day: null, className: 'cell', style: { ...bord, ...rad, background: el.cellBg, ...align }, num: String(c.adj), numStyle: { ...numBase, color: '#c8c8c8' }, label: '', labelStyle: {}, img: null };
       }
-      return { key: i, day: null, className: 'cell', style: g ? {} : { ...bord, background: el.cellBg }, num: null, numStyle: {}, label: '', labelStyle: {}, img: null };
+      const mp = bigAt.get(i);
+      return { key: i, day: null, className: 'cell', style: g && !mp ? {} : { ...bord, ...rad, background: el.cellBg }, num: null, numStyle: {}, label: '', labelStyle: {}, img: null, moon: mp && bigMoon(mp) };
     }
     const n = c.day;
     const info = el.days[n] || {};
     const h = hol[n] && !info.hideHol ? hol[n] : '';
     const hi = el.hiDays.includes(c.dow) || !!h;
-    const lbl = info.label || h;
+    const lbl = info.label || (el.labels ? h : '');
     const img = info.img && ctx.assets[info.img] ? ctx.assets[info.img].src : null;
     const dsel = ctx.edit && selDay === n;
     return {
@@ -106,6 +139,7 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
       label: lbl && L.ch > 22 ? lbl : '',
       labelStyle: { fontSize: L.labelSize, color: el.hiColor },
       img,
+      moon: smallOn.has(n) ? smallMoon(smallOn.get(n)!, n) : undefined,
     };
   });
 

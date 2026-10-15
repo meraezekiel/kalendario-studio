@@ -1,6 +1,7 @@
 'use client';
 
 import type { CellView } from '../../useCalendarElementHandler';
+import MoonIcon from './MoonIcon/implementation/MoonIcon';
 import { useDayCellHandler } from './useDayCellHandler';
 
 interface Props {
@@ -22,6 +23,7 @@ export default function DayCell({ cell, calId, editing }: Props) {
           <span key="view" className="num" style={cell.numStyle}>{cell.num}</span>
         ))}
       {cell.label && <span className="lbl" style={cell.labelStyle}>{cell.label}</span>}
+      {cell.moon && <MoonIcon moon={cell.moon} />}
     </div>
   );
 }

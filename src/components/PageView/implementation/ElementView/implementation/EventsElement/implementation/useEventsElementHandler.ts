@@ -7,6 +7,8 @@ import type { EventsEl, Page } from '@/lib/calendar/types';
 export interface EventRow {
   key: string;
   day: number;
+  /** Shown instead of the day number, e.g. "Jan 1" in a whole-year list. */
+  date?: string;
   text: string;
   holiday: boolean;
 }
@@ -14,6 +16,7 @@ export interface EventRow {
 /** Holidays plus the day labels from the calendar showing the same month on this page. */
 export function useEventsElementHandler(el: EventsEl, page: Page, ctx: RenderCtx) {
   const { y, m } = monthOf(ctx.year, page, el.mo);
+  if (el.scope === 'year') return yearRows(y, ctx.holidays);
   const hol = ctx.holidays ? holidays(y, m) : {};
   const cal = page.els.find((e) => e.type === 'cal' && e.mo === el.mo);
   const days = cal && cal.type === 'cal' ? cal.days : {};
@@ -25,5 +28,19 @@ export function useEventsElementHandler(el: EventsEl, page: Page, ctx: RenderCtx
     if (h) rows.push({ key: `h${n}`, day: n, text: h, holiday: true });
     if (c.label) rows.push({ key: `l${n}`, day: n, text: c.label, holiday: false });
   }
-  return { title: MONTHS[m].toUpperCase(), rows };
+  return { title: MONTHS[m].toUpperCase(), rows, year: false };
+}
+
+/** Every holiday of year `y`, labelled like "Jan 1". */
+function yearRows(y: number, show: boolean) {
+  const rows: EventRow[] = [];
+  if (show) {
+    for (let m = 0; m < 12; m++) {
+      const hol = holidays(y, m);
+      Object.keys(hol).map(Number).sort((a, b) => a - b).forEach((d) => {
+        rows.push({ key: `${m}-${d}`, day: d, date: `${MONTHS[m].slice(0, 3)} ${d}`, text: hol[d], holiday: true });
+      });
+    }
+  }
+  return { title: 'HOLIDAYS', rows, year: true };
 }

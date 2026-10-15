@@ -35,12 +35,13 @@ export const CUSTOM_MAX = 1500;
 export const SHAPES: [ShapeKind, string][] = [
   ['rect', 'Square'], ['rounded', 'Rounded'], ['ellipse', 'Circle'], ['line', 'Line'], ['heart', 'Heart'],
   ['star', 'Star'], ['flower', 'Flower'], ['burst', 'Burst'], ['wave', 'Wave'], ['banner', 'Banner'],
-  ['tape', 'Washi tape'], ['blob', 'Blob'], ['holes', 'Binding'],
+  ['tape', 'Washi tape'], ['blob', 'Blob'], ['holes', 'Binding'], ['slant', 'Slanted bar'],
 ];
 
 export const SHAPE_PATHS: Partial<Record<ShapeKind, string>> = {
   heart: 'M50 92C16 66 3 50 3 31A23 23 0 0 1 50 20A23 23 0 0 1 97 31C97 50 84 66 50 92Z',
   star: 'M50 3L62 37L98 38L69 59L80 95L50 74L20 95L31 59L2 38L38 37Z',
+  slant: 'M0 0H100L86 100H0Z',
   wave: 'M0 57C19 20 38 13 54 41C68 65 81 27 100 12V100H0Z',
   banner: 'M0 0H100L93 50L100 100H0L7 50Z',
   tape: 'M0 6L4 0L8 6L12 0L16 6L20 0L24 6L28 0L32 6L36 0L40 6L44 0L48 6L52 0L56 6L60 0L64 6L68 0L72 6L76 0L80 6L84 0L88 6L92 0L96 6L100 2V94L96 100L92 94L88 100L84 94L80 100L76 94L72 100L68 94L64 100L60 94L56 100L52 94L48 100L44 94L40 100L36 94L32 100L28 94L24 100L20 94L16 100L12 94L8 100L4 94L0 98Z',

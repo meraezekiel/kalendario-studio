@@ -115,6 +115,38 @@ export const TEMPLATES: Record<string, Template> = {
       return [mkPage('Legal', 'p', '#ffffff', els.concat(adEls(H)))];
     },
   },
+  business: {
+    name: 'Classic business',
+    make: () => {
+      const red = '#e3212b', navy = '#1f2a4d';
+      const side = (mo: number, x: number) => mkCal({
+        mo, side: true, x, y: 1000, w: 214, h: 176, head: true, headText: '{YEAR}|{MONTH}', headFont: 'Archivo Black', headBg: '', headColor: red, headScale: 1.1,
+        wkFont: 'Archivo Black', wkColor: navy, numFont: 'Anton', numColor: navy, hiColor: red, labels: false, lines: false,
+      });
+      return [mkPage('Long', 'p', '#ffffff', [
+        mkShape({ shape: 'rect', x: 28, y: 22, w: 738, h: 258, radius: 8, fill: 'transparent', stroke: red, sw: 2.5, name: 'Header box' }),
+        mkImage({ x: 48, y: 44, w: 130, h: 110, fit: 'contain', name: 'Logo' }),
+        mkText({ x: 190, y: 38, w: 560, h: 124, text: 'BITUIN TRADING\nCORPORATION', font: 'Anton', size: 50, color: red, lh: 1.08, ls: 0.5, name: 'Business name' }),
+        mkText({ x: 48, y: 170, w: 698, h: 64, text: 'Purok 3, Brgy. Poblacion, Your Town 6100\nTEL. #: (034) 123-4567   •   0912 345 6789', font: 'Archivo Black', size: 17, color: red, lh: 1.35, name: 'Address and phone' }),
+        mkShape({ shape: 'rect', x: 120, y: 246, w: 554, h: 5, fill: red, name: 'Red line' }),
+        mkShape({ shape: 'rect', x: 470, y: 296, w: 296, h: 74, fill: navy, name: 'Year bar' }),
+        mkShape({ shape: 'slant', x: 28, y: 296, w: 532, h: 74, fill: red, name: 'Month bar' }),
+        mkShape({ shape: 'ellipse', x: 40, y: 299, w: 68, h: 68, fill: navy, stroke: '#ffffff', sw: 3, name: 'Month number circle' }),
+        mkText({ x: 40, y: 299, w: 68, h: 68, text: '{NUM}', font: 'Anton', size: 34, color: '#ffffff', name: 'Month number' }),
+        mkText({ x: 116, y: 294, w: 400, h: 78, text: '{MONTH}', font: 'Anton', size: 62, color: '#ffffff', ls: 2, name: 'Month name' }),
+        mkText({ x: 560, y: 294, w: 196, h: 78, text: '{YEAR}', font: 'Anton', size: 56, color: '#ffffff', ls: 1, name: 'Year' }),
+        mkCal({
+          x: 28, y: 374, w: 738, h: 612, moon: true, wkFont: 'Archivo Black', wkColor: navy, numFont: 'Anton', numColor: navy, numScale: 1.15,
+          hiColor: red, labels: false, lineColor: '#9aa0ad', border: 1.5, borderColor: '#5b6170', name: 'Main calendar',
+        }),
+        side(-1, 28),
+        mkShape({ shape: 'rect', x: 252, y: 1000, w: 290, h: 176, radius: 4, fill: 'transparent', stroke: red, sw: 1.5, name: 'Holiday box' }),
+        mkEvents({ scope: 'year', x: 260, y: 1005, w: 276, h: 168, size: 8.5, cols: 2, color: red, hiColor: red, titleColor: red, titleFont: 'Anton', name: 'Holidays' }),
+        side(1, 552),
+        mkText({ x: 28, y: 1182, w: 738, h: 24, text: 'Red days are Sundays and holidays • Moon phases in Philippine time • Not responsible for typographical errors', font: 'Poppins', size: 9, bold: true, upper: true, color: navy, name: 'Footnote' }),
+      ])];
+    },
+  },
   desk: {
     name: 'Desk calendar 8×5 in',
     make: () => [mkPage('Desk', 'l', '#fffaf3', [
@@ -131,7 +163,7 @@ export const TEMPLATES: Record<string, Template> = {
       mkImage({ x: 0, y: 0, w: 794, h: 447, src: '@sample', isBg: true, name: 'Background' }),
       mkShape({ shape: 'rect', x: 488, y: 34, w: 280, h: 379, radius: 16, fill: '#ffffff', op: 0.86, name: 'Calendar card' }),
       mkText({ x: 500, y: 44, w: 256, h: 50, text: '{Month} {YEAR}', font: 'Poppins', size: 26, bold: true, color: '#20263a', name: 'Month title' }),
-      mkCal({ x: 500, y: 100, w: 256, h: 300, wkFont: 'Poppins', numFont: 'Poppins', numColor: '#20263a', wkColor: '#7a8199', lineColor: 'transparent', hiColor: '#e2557f', labels: false }),
+      mkCal({ x: 500, y: 100, w: 256, h: 300, wkFont: 'Poppins', numFont: 'Poppins', numColor: '#20263a', wkColor: '#7a8199', lineColor: 'transparent', hiColor: '#e2557f' }),
     ])],
   },
   mini3: {
@@ -139,7 +171,7 @@ export const TEMPLATES: Record<string, Template> = {
     make: () => [mkPage('Sq3', 'p', '#fdf6fa', [
       mkText({ x: 30, y: 26, w: 734, h: 120, text: '{MONTH}', font: 'Fredoka', size: 88, bold: true, color: '#c76a9a', ls: 4, name: 'Month name' }),
       mkText({ x: 30, y: 136, w: 734, h: 60, text: '{YEAR}', font: 'Fredoka', size: 44, bold: true, color: '#dcc8d4', name: 'Year' }),
-      pastelCal({ x: 30, y: 214, w: 734, h: 550, labels: false }),
+      pastelCal({ x: 30, y: 214, w: 734, h: 550 }),
     ])],
   },
   blank: { name: 'Blank page', make: () => [mkPage('A4', 'p', '#ffffff', [])] },

@@ -25,9 +25,9 @@ export function monthOf(year: number, pg: Page, mo = 0) {
   return { y: year + Math.floor(a / 12), m: ((a % 12) + 12) % 12 };
 }
 
-/** Replaces {MONTH}, {Month}, {month}, {MON}, {Mon}, {YEAR} and offsets like {MONTH+1}. */
+/** Replaces {MONTH}, {Month}, {month}, {MON}, {Mon}, {NUM} (1-12), {YEAR} and offsets like {MONTH+1}. */
 export function tok(s: string, year: number, pg: Page, base = 0): string {
-  return String(s).replace(/\{(MONTH|Month|month|MON|Mon|YEAR)([+-]\d+)?\}/g, (_, k: string, o?: string) => {
+  return String(s).replace(/\{(MONTH|Month|month|MON|Mon|NUM|YEAR)([+-]\d+)?\}/g, (_, k: string, o?: string) => {
     const { y, m } = monthOf(year, pg, base + +(o || 0));
     switch (k) {
       case 'MONTH': return MONTHS[m].toUpperCase();
@@ -35,6 +35,7 @@ export function tok(s: string, year: number, pg: Page, base = 0): string {
       case 'month': return MONTHS[m].toLowerCase();
       case 'MON': return MONTHS[m].slice(0, 3).toUpperCase();
       case 'Mon': return MONTHS[m].slice(0, 3);
+      case 'NUM': return String(m + 1);
       default: return String(y);
     }
   });
@@ -56,7 +57,7 @@ export function makeYear(doc: CalendarDoc): number {
   const cur = doc.pages[doc.cur];
   const b = cur.month;
   const set = doc.pages.filter((p) => p.month === b);
-  const step = Math.max(1, ...set.flatMap((p) => p.els.flatMap((e) => (e.type === 'cal' || e.type === 'events' ? [e.mo + 1] : []))));
+  const step = Math.max(1, ...set.flatMap((p) => p.els.flatMap((e) => ((e.type === 'cal' && !e.side) || (e.type === 'events' && e.scope !== 'year') ? [e.mo + 1] : []))));
   const out: Page[] = [];
   for (let m = b; m < 12; m += step) {
     if (m === b) {

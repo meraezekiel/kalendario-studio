@@ -52,7 +52,7 @@ export interface ImageEl extends BaseEl {
 
 export type ShapeKind =
   | 'rect' | 'rounded' | 'ellipse' | 'line' | 'heart' | 'star' | 'flower'
-  | 'burst' | 'wave' | 'banner' | 'tape' | 'blob' | 'holes';
+  | 'burst' | 'wave' | 'banner' | 'tape' | 'blob' | 'holes' | 'slant';
 
 export interface ShapeEl extends BaseEl {
   type: 'shape';
@@ -106,6 +106,10 @@ export interface CalEl extends BaseEl {
   border: number;
   borderColor: string;
   adjacent: boolean;
+  /** Shows the moon phases, in the empty boxes when there is room, otherwise as small icons on their days. */
+  moon?: boolean;
+  /** A small side calendar (e.g. last or next month); not counted when filling the year. */
+  side?: boolean;
   days: Record<number, DayInfo>;
 }
 
@@ -120,6 +124,8 @@ export interface EventsEl extends BaseEl {
   titleFont: string;
   titleColor: string;
   cols: number;
+  /** 'year' lists every holiday of the year instead of one month's. */
+  scope?: 'month' | 'year';
 }
 
 /** A ready-made illustration or gradient from the Graphics library. */

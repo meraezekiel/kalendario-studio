@@ -73,6 +73,7 @@ const SHAPE_PRESETS: Record<ShapeKind, Partial<ShapeEl>> = {
   flower: { w: 130, h: 130 }, burst: { w: 150, h: 150, fill: '#f5b800' }, wave: { w: 794, h: 150, fill: '#4b1f50' },
   banner: { w: 340, h: 56, fill: '#e3212b' }, tape: { w: 200, h: 52, fill: '#b9a2df', rot: -6 },
   blob: { w: 200, h: 180, fill: '#93d9b8' }, holes: { w: 706, h: 15, fill: '#3b3540' },
+  slant: { w: 420, h: 70, fill: '#e3212b' },
 };
 
 export function addShape(s: ShapeKind) {

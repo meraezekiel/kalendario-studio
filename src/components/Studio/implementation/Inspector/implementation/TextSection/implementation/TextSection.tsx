@@ -18,7 +18,7 @@ export default function TextSection({ el }: { el: TextEl }) {
       <Section title="Text">
         <AreaField label="Text" {...bind('text')} />
         <p className="hint" style={{ margin: '-4px 0 10px' }}>
-          Type {'{MONTH}'}, {'{Month}'} or {'{YEAR}'} to fill in the page&apos;s month. {'{MONTH+1}'} shows the next month.
+          Type {'{MONTH}'}, {'{Month}'} or {'{YEAR}'} to fill in the page&apos;s month. {'{MONTH+1}'} shows the next month, {'{NUM}'} the month number.
         </p>
         <FontField label="Font" {...bind('font')} />
         <div className="g2">

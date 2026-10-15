@@ -20,5 +20,6 @@ export function elName(e: El, year: number, pg: Page): string {
 
 /** Options for "which month does this calendar show", relative to the page's month. */
 export function monthOffsetOptions(year: number, pg: Page) {
-  return Array.from({ length: 12 }, (_, o) => [o, `${MONTHS[monthOf(year, pg, o).m]}${o === 0 ? ' (page month)' : ` (+${o})`}`] as const);
+  // -1 is for a small "last month" calendar beside the main one.
+  return Array.from({ length: 13 }, (_, i) => i - 1).map((o) => [o, `${MONTHS[monthOf(year, pg, o).m]}${o === 0 ? ' (page month)' : o < 0 ? ' (previous month)' : ` (+${o})`}`] as const);
 }

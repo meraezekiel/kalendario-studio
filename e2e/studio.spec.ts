@@ -264,6 +264,8 @@ test.describe('Kalendaryo Studio', () => {
     await expect(cal.locator('.cell[data-day="6"] .num')).toHaveCSS('color', 'rgb(226, 85, 127)');
     await page.getByLabel('Show holiday names in the boxes').uncheck();
     await expect(cal.locator('.lbl', { hasText: "New Year's Day" })).toHaveCount(0);
+    // Without names, holidays still get the holiday colour.
+    await expect(cal.locator('.cell[data-day="1"] .num')).toHaveCSS('color', 'rgb(226, 85, 127)');
 
     // Photo: circle, empty frame, sample photo.
     const photo = page.locator('.ph .el-image').first();
@@ -711,11 +713,14 @@ test.describe('Kalendaryo Studio', () => {
     await page.screenshot({ path: 'e2e/shots/30-desk.png' });
 
     await chooseTemplate(page, 'Desktop wallpaper');
+    await expect(page.locator('.ph .cell[data-day="1"] .lbl')).toHaveText("New Year's Day");
     expect(await ratio()).toBeCloseTo(16 / 9, 1);
     await expect(page.locator('.ph [data-bg]')).toHaveCount(1);
     await page.screenshot({ path: 'e2e/shots/31-wallpaper.png' });
 
     await chooseTemplate(page, 'Mini 3×3 in');
+    await expect(page.locator('.ph .cell[data-day="1"] .lbl')).toHaveText("New Year's Day");
+    await expect(page.locator('.ph .cell[data-day="1"] .num')).toHaveCSS('color', 'rgb(226, 85, 127)');
     expect(await ratio()).toBeCloseTo(1, 2);
     await page.getByRole('button', { name: 'Pages', exact: true }).click();
     // Square paper has no portrait/landscape choice.

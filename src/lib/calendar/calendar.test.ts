@@ -27,6 +27,7 @@ describe('tokens', () => {
     expect(tok('{MONTH} {YEAR}', 2027, pg)).toBe('DECEMBER 2027');
     expect(tok('{Month+1} {YEAR+1}', 2027, pg)).toBe('January 2028');
     expect(tok('{Mon}/{mon}', 2027, pg)).toBe('Dec/{mon}');
+    expect(tok('{NUM} {NUM+1} {NUM-1}', 2027, pg)).toBe('12 1 11');
     expect(monthOf(2027, pg, 2)).toEqual({ y: 2028, m: 1 });
   });
 });
@@ -65,6 +66,10 @@ describe('makeYear / syncDesign', () => {
     const d = docWith();
     expect(makeYear(d)).toBe(12);
     expect(d.pages.map((p) => p.month)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+  it('ignores side calendars (last/next month) when stepping', () => {
+    const d = docWith(TEMPLATES.business.make());
+    expect(makeYear(d)).toBe(12);
   });
   it('steps by three for a three-month sheet', () => {
     const d = docWith(TEMPLATES.give3.make());

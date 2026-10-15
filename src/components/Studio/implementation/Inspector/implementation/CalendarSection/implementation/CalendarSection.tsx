@@ -69,6 +69,9 @@ export default function CalendarSection({ el }: { el: CalEl }) {
           ))}
         </div>
         <CheckField label="Show holiday names in the boxes" {...bind('labels')} />
+        <CheckField label="Moon phases" value={!!el.moon} onChange={(v) => bind('moon').onChange(v)} />
+        <CheckField label="Side calendar (last / next month)" value={!!el.side} onChange={(v) => bind('side').onChange(v)} />
+        <p className="hint">Moon phases fill the empty boxes (Philippine time). Side calendars are skipped when counting months for “Fill the rest of the year”.</p>
       </Section>
       <Section title="Grid & boxes" open={false}>
         <CheckField label="Grid lines" {...bind('lines')} />
