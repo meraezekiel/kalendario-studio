@@ -16,6 +16,10 @@ describe('graphics library', () => {
     expect(searchGraphics('pasko').map((g) => g.key)).toContain('fluent/christmas-tree');
     expect(searchGraphics('carabao').map((g) => g.key)).toEqual(['fluent/water-buffalo']);
     expect(searchGraphics('  ')).toEqual([]);
+    expect(searchGraphics('fb').map((g) => g.key)).toContain('social/facebook-badge');
+    expect(searchGraphics('tiktok').map((g) => g.key)).toEqual(['social/tiktok-badge', 'social/tiktok-color', 'social/tiktok-black']);
+    expect(searchGraphics('telepono').map((g) => g.key)).toContain('social/phone-color');
+    expect(findGraphic('social/instagram-badge')?.stretch).toBe(false);
     expect(findGraphic('gradient/sunset')?.stretch).toBe(true);
     expect(findGraphic('fluent/mango')?.stretch).toBe(false);
   });

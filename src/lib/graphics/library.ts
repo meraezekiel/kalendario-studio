@@ -3,6 +3,7 @@ import { DECOS, type DecoKind, decoThumb, PALETTES, type PaletteId } from './dec
 import { PACK_KINDS } from './packs';
 import { PACK2_KINDS } from './packs2';
 import peeps from './peeps.json';
+import social from './social.json';
 
 export interface Graphic {
   /**
@@ -100,6 +101,20 @@ const PACKS: PackDef[] = [
   { id: 'pack-vivid-leaves', label: 'Vivid leaves', items: both(PACK2_KINDS.vleaves, ['vivid', 'summer']) },
   people('pack-people', 'Hand-drawn people', 'people'),
 ];
+/** Social media logos and contact icons, each as a round badge, in colour and in black. */
+const SOCIAL: GraphicCategory = {
+  id: 'social',
+  label: 'Social media & contact',
+  items: social.icons.flatMap((i) =>
+    social.variants.map(([v, name]) => ({
+      key: `social/${i.id}-${v}`,
+      label: `${i.label} (${name})`,
+      words: `${i.label} ${i.id} ${i.words} ${name} social media socmed contact logo icon`.toLowerCase(),
+      stretch: false,
+    })),
+  ),
+};
+
 const decoItem = (kind: DecoKind, palette: PaletteId, cat: string): Graphic => ({
   key: `deco/${kind}:${palette}`,
   label: `${DECOS[kind].label} (${PALETTES[palette].label})`,
@@ -117,7 +132,9 @@ export const GRAPHIC_CATEGORIES: GraphicCategory[] = [
     items: 'items' in c
       ? c.items.map(([k, p]) => decoItem(k, p, c.label))
       : c.files.names.map(([file, label]) => ({ key: `${c.files.dir}/${file}`, label, words: `${label} ${file.replace(/-/g, ' ')} ${c.files.words}`.toLowerCase(), stretch: false })),
-  })),  ...DECO_SETS.map((c) => ({ id: c.id, label: c.label, items: c.items.map(([k, p]) => decoItem(k, p, c.label)) })),
+  })),
+  SOCIAL,
+  ...DECO_SETS.map((c) => ({ id: c.id, label: c.label, items: c.items.map(([k, p]) => decoItem(k, p, c.label)) })),
   ...catalog.categories.map((c) => ({
     id: c.id,
     label: c.label,

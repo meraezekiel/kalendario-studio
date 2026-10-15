@@ -1,0 +1,30 @@
+{
+  "variants": [["badge", "round"], ["color", "color"], ["black", "black"]],
+  "icons": [
+    { "id": "facebook", "label": "Facebook", "si": "siFacebook", "words": "fb page" },
+    { "id": "messenger", "label": "Messenger", "si": "siMessenger", "words": "chat message fb" },
+    { "id": "instagram", "label": "Instagram", "si": "siInstagram", "words": "ig insta" },
+    { "id": "tiktok", "label": "TikTok", "si": "siTiktok", "words": "tik tok video" },
+    { "id": "youtube", "label": "YouTube", "si": "siYoutube", "words": "yt video channel" },
+    { "id": "x", "label": "X (Twitter)", "si": "siX", "words": "twitter tweet" },
+    { "id": "threads", "label": "Threads", "si": "siThreads", "words": "" },
+    { "id": "viber", "label": "Viber", "si": "siViber", "words": "chat call" },
+    { "id": "whatsapp", "label": "WhatsApp", "si": "siWhatsapp", "words": "chat call whats app" },
+    { "id": "telegram", "label": "Telegram", "si": "siTelegram", "words": "chat" },
+    { "id": "linkedin", "label": "LinkedIn", "si": "siLinkedin", "words": "linked in work" },
+    { "id": "pinterest", "label": "Pinterest", "si": "siPinterest", "words": "" },
+    { "id": "discord", "label": "Discord", "si": "siDiscord", "words": "chat" },
+    { "id": "spotify", "label": "Spotify", "si": "siSpotify", "words": "music" },
+    { "id": "shopee", "label": "Shopee", "si": "siShopee", "words": "shop online store" },
+    { "id": "grab", "label": "Grab", "si": "siGrab", "words": "delivery ride" },
+    { "id": "foodpanda", "label": "foodpanda", "si": "siFoodpanda", "words": "food delivery" },
+    { "id": "gmail", "label": "Gmail", "si": "siGmail", "words": "email mail google" },
+    { "id": "googlemaps", "label": "Google Maps", "si": "siGooglemaps", "words": "map location address directions" },
+    { "id": "phone", "label": "Phone", "mdi": "phone", "color": "#2e7d32", "words": "call telephone telepono landline tel number" },
+    { "id": "mobile", "label": "Mobile", "mdi": "cellphone", "color": "#37474f", "words": "cellphone cp text sms number" },
+    { "id": "email", "label": "Email", "mdi": "email", "color": "#d93025", "words": "mail" },
+    { "id": "website", "label": "Website", "mdi": "web", "color": "#1a73e8", "words": "web www internet site globe" },
+    { "id": "location", "label": "Location", "mdi": "map-marker", "color": "#ea4335", "words": "address map pin place" },
+    { "id": "store", "label": "Store", "mdi": "storefront", "color": "#f57c00", "words": "shop branch tindahan" }
+  ]
+}
