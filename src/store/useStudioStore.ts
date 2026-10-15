@@ -7,7 +7,7 @@ import { makeYear } from '@/lib/calendar/document';
 import { TEMPLATES } from '@/lib/calendar/templates';
 import type { CalendarDoc, El, Page } from '@/lib/calendar/types';
 
-export type DrawerTab = 'templates' | 'add' | 'graphics' | 'photos' | 'page';
+export type DrawerTab = 'templates' | 'add' | 'graphics' | 'photos' | 'page' | 'support';
 export interface Guide { v?: number; h?: number }
 export interface Editing { id: string; day?: number }
 export interface Rect { x: number; y: number; w: number; h: number }
@@ -41,6 +41,8 @@ interface StudioState {
   printing: number[] | null;
   /** True while the current page is rendered offscreen for PNG export. */
   exporting: boolean;
+  /** Shows the one-time thank-you note after the first export or print. */
+  thanks: boolean;
   toast: { msg: string; n: number } | null;
   past: CalendarDoc[];
   future: CalendarDoc[];
@@ -56,7 +58,7 @@ interface StudioState {
   select: (id: string | null, day?: number | null) => void;
   /** Selects several elements; one id falls back to a normal single selection. */
   selectMany: (ids: string[]) => void;
-  set: (patch: Partial<Pick<StudioState, 'cropId' | 'armed' | 'editing' | 'tab' | 'clip' | 'guides' | 'marquee' | 'sel' | 'selDay' | 'printing' | 'exporting'>>) => void;
+  set: (patch: Partial<Pick<StudioState, 'cropId' | 'armed' | 'editing' | 'tab' | 'clip' | 'guides' | 'marquee' | 'sel' | 'selDay' | 'printing' | 'exporting' | 'thanks'>>) => void;
   showToast: (msg: string) => void;
   hydrate: (doc: CalendarDoc | null) => void;
 }
@@ -77,6 +79,7 @@ export const useStudioStore = create<StudioState>()(
     guides: [],
     printing: null,
     exporting: false,
+    thanks: false,
     toast: null,
     past: [],
     future: [],

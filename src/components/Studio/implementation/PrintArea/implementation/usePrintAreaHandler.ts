@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { DW } from '@/lib/calendar/constants';
 import { dims } from '@/lib/calendar/document';
+import { offerThanks } from '@/store/actions';
 import { useStudioStore } from '@/store/useStudioStore';
 
 /** Renders the requested pages at paper size, sets @page size, then opens the print dialog. */
@@ -21,6 +22,7 @@ export function usePrintAreaHandler() {
       if (done) return;
       done = true;
       useStudioStore.getState().set({ printing: null });
+      offerThanks();
     };
     addEventListener('afterprint', finish, { once: true });
     const t = setTimeout(() => {

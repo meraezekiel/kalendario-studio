@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { toPng } from 'html-to-image';
+import { offerThanks } from '@/store/actions';
 import { curPage, toast, useStudioStore } from '@/store/useStudioStore';
 
 /** While exporting, renders the current page offscreen and downloads it as a 2.5× PNG. */
@@ -25,6 +26,7 @@ export function useExportBoxHandler() {
         a.click();
         a.remove();
         toast('PNG saved to your downloads.');
+        offerThanks();
       } catch {
         toast('PNG export failed. Use Print and choose “Save as PDF” instead.');
       } finally {

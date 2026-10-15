@@ -11,12 +11,15 @@ const TABS: { id: DrawerTab; label: string; icon: React.ReactNode }[] = [
   { id: 'page', label: 'Pages', icon: <><path d="M6 3h9l4 4v14H6z" /><path d="M15 3v4h4" /></> },
 ];
 
+const SUPPORT_TAB = { id: 'support' as const, label: 'Support', icon: <><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z" /><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17" /><path d="M8 3c0 1.5 1 1.5 1 3M12 3c0 1.5 1 1.5 1 3" /></> };
+
 export default function ToolRail() {
-  const { tab, setTab } = useToolRailHandler();
+  const { tab, setTab, showSupport } = useToolRailHandler();
+  const tabs = showSupport ? [...TABS, SUPPORT_TAB] : TABS;
   return (
     <nav className="rail" aria-label="Tools">
-      {TABS.map((t) => (
-        <button key={t.id} className={tab === t.id ? 'on' : ''} aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>
+      {tabs.map((t) => (
+        <button key={t.id} className={`${tab === t.id ? 'on' : ''}${t.id === 'support' ? ' rail-end' : ''}`} aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">{t.icon}</svg>
           {t.label}
         </button>

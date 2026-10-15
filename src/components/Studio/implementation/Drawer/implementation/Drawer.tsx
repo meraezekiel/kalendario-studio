@@ -4,6 +4,7 @@ import AddPanel from './AddPanel/implementation/AddPanel';
 import GraphicsPanel from './GraphicsPanel/implementation/GraphicsPanel';
 import PagesPanel from './PagesPanel/implementation/PagesPanel';
 import PhotosPanel from './PhotosPanel/implementation/PhotosPanel';
+import SupportPanel from './SupportPanel/implementation/SupportPanel';
 import TemplatesPanel from './TemplatesPanel/implementation/TemplatesPanel';
 import { useDrawerHandler } from './useDrawerHandler';
 
@@ -16,6 +17,7 @@ export default function Drawer() {
       {tab === 'graphics' && <GraphicsPanel />}
       {tab === 'photos' && <PhotosPanel />}
       {tab === 'page' && <PagesPanel />}
+      {tab === 'support' && <SupportPanel />}
     </aside>
   );
 }

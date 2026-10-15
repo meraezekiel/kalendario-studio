@@ -8,6 +8,7 @@ import { findGraphic } from '@/lib/graphics/library';
 import { rememberGraphic } from '@/lib/graphics/recent';
 import { readImage } from '@/lib/calendar/samplePhoto';
 import { giveCal, TEMPLATES } from '@/lib/calendar/templates';
+import { hasSupport, markThanksSeen, thanksSeen } from '@/lib/support/support';
 import type { CalEl, El, Page, ShapeEl, ShapeKind } from '@/lib/calendar/types';
 import { clamp, clone, uid } from '@/lib/calendar/utils';
 import { curPage, findEl, type PickTarget, selIds, toast, useStudioStore } from './useStudioStore';
@@ -477,6 +478,17 @@ export function printPages(all: boolean) {
   const idx = doc.pages.map((p, i) => (JSON.stringify(p.paper) === key ? i : -1)).filter((i) => i >= 0);
   if (idx.length < doc.pages.length) toast(`Printing the ${idx.length} pages that use ${dims(pg).label}. Go to a page with the other paper size and print again for the rest.`);
   S().set({ printing: idx });
+}
+
+/** Slightly longer than a toast stays on screen. */
+const THANKS_DELAY_MS = 3900;
+
+/** After the first finished export or print, shows a small thank-you note once per browser. */
+export function offerThanks() {
+  if (!hasSupport() || thanksSeen()) return;
+  markThanksSeen();
+  // Waits for the "saved" message to fade so the two never overlap.
+  setTimeout(() => S().set({ thanks: true }), THANKS_DELAY_MS);
 }
 
 export function exportPNG() {
