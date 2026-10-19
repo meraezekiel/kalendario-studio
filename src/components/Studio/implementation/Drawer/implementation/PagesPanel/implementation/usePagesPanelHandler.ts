@@ -1,6 +1,6 @@
 import { MONTHS, PAPERS } from '@/lib/calendar/constants';
 import type { PaperKey } from '@/lib/calendar/types';
-import { addPage, applyDesignToAll, deletePage, fillYear, movePage, openDesignFile, pickMonthBackgrounds, saveDesignFile, setPaper } from '@/store/actions';
+import { addPage, applyDesignToAll, deletePage, fillYear, movePage, openDesignFile, pickMonthBackgrounds, saveDesignFile, setPaper, setYear } from '@/store/actions';
 import { curPage, useStudioStore } from '@/store/useStudioStore';
 
 export const MONTH_OPTIONS = MONTHS.map((m, i) => [i, m] as const);
@@ -24,17 +24,15 @@ export function usePagesPanelHandler() {
     setBg: (bg: string) => mutate((d) => void (curPage(d).bg = bg), { key: `pg:${page.id}:bg` }),
     setPaperSize: (size: PaperKey) => setPaper({ size }),
     setOrientation: (o: 'p' | 'l') => setPaper({ o }),
-    setYear: (y: number) => {
-      if (y >= 1900 && y <= 2200) mutate((d) => void (d.year = y), { key: 'doc:year' });
-    },
+    setYear: (y: number) => void setYear(y),
     setHolidays: (v: boolean) => mutate((d) => void (d.holidays = v)),
     addBlank: () => addPage(false),
     duplicatePage: () => addPage(true),
     moveEarlier: () => movePage(-1),
     moveLater: () => movePage(1),
     deletePage,
-    fillYear,
-    applyDesignToAll,
+    fillYear: () => void fillYear(),
+    applyDesignToAll: () => void applyDesignToAll(),
     monthBackgrounds: pickMonthBackgrounds,
     saveFile: saveDesignFile,
     openFile: openDesignFile,

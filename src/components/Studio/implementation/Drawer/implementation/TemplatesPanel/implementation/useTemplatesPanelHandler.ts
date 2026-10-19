@@ -17,5 +17,5 @@ export function useTemplatesPanelHandler() {
       }),
     [],
   );
-  return { items, choose: applyTemplate };
+  return { items, choose: (key: string) => void applyTemplate(key) };
 }

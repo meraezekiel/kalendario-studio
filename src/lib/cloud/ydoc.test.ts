@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { TEMPLATES } from '../calendar/templates';
 import type { CalendarDoc, TextEl } from '../calendar/types';
+import { LOCAL, LOCAL_UNTRACKED } from './sync';
+import { makeUndoDriver } from './undo';
 import { applyDiff, fromB64, readDoc, ROOT, toB64, writeDoc } from './ydoc';
 
 const mkDoc = (): CalendarDoc => ({ v: 3, year: 2027, holidays: true, cur: 0, assets: { a1: { src: 'data:x', w: 1, h: 2 } }, tray: ['a1'], pages: TEMPLATES.pastel.make() });
@@ -140,6 +142,49 @@ describe('ydoc', () => {
     y.on('update', () => n++);
     applyDiff(y, doc, { ...doc, cur: 2 });
     expect(n).toBe(0);
+  });
+
+  it('undo manager only reverts local changes', () => {
+    const doc = mkDoc();
+    const [a, b] = pair(doc);
+    let applied = 0;
+    const undo = makeUndoDriver(a, () => { applied++; });
+    expect(undo.undo()).toBe(false); // nothing to undo yet
+    const x0 = doc.pages[0].els[0].x;
+    const moved = edit(doc, (d) => { d.pages[0].els[0].x = x0 + 50; });
+    applyDiff(a, doc, moved, LOCAL);
+    // Untracked changes (photos in the tray) are not undone.
+    undo.stop();
+    applyDiff(a, moved, edit(moved, (d) => { d.tray = [...d.tray, 'a2']; }), LOCAL_UNTRACKED);
+    applyDiff(b, doc, edit(doc, (d) => { (d.pages[0].els[1] as TextEl).text = 'theirs'; }));
+    sync(a, b);
+    expect(undo.undo()).toBe(true);
+    expect(applied).toBe(1);
+    sync(a, b);
+    for (const y of [a, b]) {
+      const r = readDoc(y)!;
+      expect(r.pages[0].els[0].x).toBe(x0);
+      expect((r.pages[0].els[1] as TextEl).text).toBe('theirs');
+      expect(r.tray).toContain('a2');
+    }
+    expect(undo.redo()).toBe(true);
+    expect(readDoc(a)!.pages[0].els[0].x).toBe(x0 + 50);
+    undo.destroy();
+  });
+
+  it('undo driver stop() splits steps that would otherwise merge', () => {
+    const doc = mkDoc();
+    const y = new Y.Doc();
+    writeDoc(y, doc);
+    const undo = makeUndoDriver(y, () => {});
+    const one = edit(doc, (d) => { d.pages[0].els[0].x = 1; });
+    const two = edit(one, (d) => { d.pages[0].els[0].x = 2; });
+    applyDiff(y, doc, one, LOCAL);
+    undo.stop();
+    applyDiff(y, one, two, LOCAL);
+    undo.undo();
+    expect(readDoc(y)!.pages[0].els[0].x).toBe(1);
+    undo.destroy();
   });
 
   it('toB64/fromB64 round-trip', () => {

@@ -4,15 +4,58 @@ import { toJpeg } from 'html-to-image';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import type { CalendarDoc } from '@/lib/calendar/types';
 import { getDesign, saveThumb } from '@/lib/cloud/designs';
+import { colorFor, type PresencePayload, readOthers } from '@/lib/cloud/presence';
 import { DesignSync, type SyncStatus } from '@/lib/cloud/sync';
 import { SupabaseTransport } from '@/lib/cloud/transport';
+import { makeUndoDriver } from '@/lib/cloud/undo';
 import type { SharedDoc } from '@/lib/cloud/ydoc';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCloudStore } from '@/store/useCloudStore';
-import { freshDoc, useStudioStore } from '@/store/useStudioStore';
+import { freshDoc, selIds, useStudioStore } from '@/store/useStudioStore';
 
 const THUMB_EVERY_MS = 60_000;
 const THUMB_W = 320;
+/** Presence updates (page, selection) go out at most this often. */
+const PRESENCE_MS = 150;
+
+const sameSel = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+/**
+ * Shares this tab's page and selection on the design channel's presence, throttled, until `stop()`.
+ * `track` says whether it could be sent (the channel may not be joined yet).
+ */
+function followPresence(base: Pick<PresencePayload, 'uid' | 'name' | 'color'>, track: (p: PresencePayload) => boolean) {
+  let last: PresencePayload | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let sentAt = -Infinity;
+  const now = (): PresencePayload => {
+    const s = useStudioStore.getState();
+    return { ...base, page: s.doc.cur, sel: selIds(s) };
+  };
+  const send = (force = false) => {
+    timer = null;
+    const p = now();
+    if (!force && last && last.page === p.page && sameSel(last.sel, p.sel)) return;
+    if (!track(p)) return;
+    last = p;
+    sentAt = Date.now();
+  };
+  const schedule = () => {
+    if (timer) return;
+    timer = setTimeout(() => send(), Math.max(0, sentAt + PRESENCE_MS - Date.now()));
+  };
+  const unsub = useStudioStore.subscribe((s, prev) => {
+    if (s.doc.cur !== prev.doc.cur || s.sel !== prev.sel || s.multi !== prev.multi) schedule();
+  });
+  return {
+    /** Sends the current state now (after joining or rejoining the channel). */
+    resend: () => send(true),
+    stop: () => {
+      unsub();
+      if (timer) clearTimeout(timer);
+    },
+  };
+}
 
 /** The first page as drawn on the stage, or null when another page is showing. */
 function firstPageNode(): HTMLElement | null {
@@ -69,6 +112,10 @@ export function useCloudSessionHandler(designId: string) {
     let sync: DesignSync | null = null;
     let started: Promise<unknown> = Promise.resolve();
     const offs: (() => void)[] = [];
+    const me = useAuthStore.getState().user;
+    /** This tab's presence key: one person may have the design open in several tabs. */
+    const presenceKey = `${userId}:${Math.random().toString(36).slice(2, 10)}`;
+    let presence: ReturnType<typeof followPresence> | null = null;
 
     /** This person's role is known: owners and editors may edit (unless access went meanwhile). */
     const learned = (info: NonNullable<Awaited<ReturnType<typeof getDesign>>>) => {
@@ -124,7 +171,20 @@ export function useCloudSessionHandler(designId: string) {
       }
       if (info) learned(info);
 
-      const s = new DesignSync(designId, new SupabaseTransport(designId, userId), {
+      const transport = new SupabaseTransport(designId, userId);
+      transport.presence(presenceKey, (state) => {
+        if (cancelled) return;
+        useCloudStore.getState().patch({ others: readOthers(state, presenceKey) });
+        // Just joined (or rejoined) the channel: say where this tab is.
+        if (!state[presenceKey]) presence?.resend();
+      });
+      presence = followPresence({ uid: userId, name: me?.name || me?.email || 'Someone', color: colorFor(userId) }, (p) => {
+        const ch = transport.channel();
+        if (ch?.state !== 'joined') return false;
+        void ch.track(p).catch(() => {});
+        return true;
+      });
+      const s = new DesignSync(designId, transport, {
         persist: (y) => new IndexeddbPersistence(`kal-design-${designId}`, y),
       });
       sync = s;
@@ -134,6 +194,14 @@ export function useCloudSessionHandler(designId: string) {
       const doc = (await started) as SharedDoc | null;
       if (cancelled) return;
       onStatus(s.status);
+      // Undo and redo take back only this person's own changes; the engine pushes them and refreshes the store.
+      const undo = makeUndoDriver(
+        s.ydoc,
+        () => useStudioStore.setState({ cropId: null, editing: null, lastKey: null }),
+        (undoable) => useCloudStore.getState().patch({ undoable }),
+      );
+      offs.push(() => undo.destroy());
+      useStudioStore.setState({ historyDriver: undo });
       // Edits go into the Y.Doc; remote changes come back through applyRemote, which never calls this.
       useStudioStore.setState({
         onLocalChange: (prev, next, tracked) => {
@@ -148,6 +216,7 @@ export function useCloudSessionHandler(designId: string) {
     return () => {
       cancelled = true;
       offs.forEach((off) => off());
+      presence?.stop();
       // Leave nothing of this design in the store (history and selection included) for the next screen.
       useStudioStore.setState({ onLocalChange: null, readOnly: false, historyDriver: null });
       useStudioStore.getState().hydrate(freshDoc());

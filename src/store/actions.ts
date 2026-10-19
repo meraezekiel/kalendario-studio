@@ -18,7 +18,7 @@ import { importDoc } from '@/lib/cloud/importDoc';
 import { copyDesign } from '@/lib/cloud/members';
 import { CloudError } from '@/lib/cloud/transport';
 import { useAuthStore } from './useAuthStore';
-import { useCloudStore } from './useCloudStore';
+import { confirmReplaceAll, useCloudStore } from './useCloudStore';
 import { curPage, findEl, type PickTarget, selIds, toast, useStudioStore } from './useStudioStore';
 
 const S = () => useStudioStore.getState();
@@ -449,7 +449,8 @@ export function movePage(dir: -1 | 1) {
   });
 }
 
-export function applyTemplate(key: string) {
+export async function applyTemplate(key: string) {
+  if (!(await confirmReplaceAll())) return;
   S().mutate((d) => {
     d.pages = TEMPLATES[key].make();
     d.cur = 0;
@@ -459,7 +460,8 @@ export function applyTemplate(key: string) {
   toast(`${TEMPLATES[key].name}: ${S().doc.pages.length} pages ready. Change anything, then use “Apply design to all months”.`);
 }
 
-export function fillYear() {
+export async function fillYear() {
+  if (!(await confirmReplaceAll())) return;
   let n = 0;
   const b = curPage(S().doc).month;
   S().mutate((d) => void (n = makeYear(d)));
@@ -467,11 +469,21 @@ export function fillYear() {
   toast(`${n} page${n > 1 ? 's' : ''} ready, ${MONTHS[b]} to December.`);
 }
 
-export function applyDesignToAll() {
+export async function applyDesignToAll() {
+  if (!(await confirmReplaceAll())) return;
   let n = 0;
   S().mutate((d) => void (n = syncDesign(d)));
   S().select(null);
   toast(n ? `Design copied to ${n} other page${n > 1 ? 's' : ''}. Each month kept its own photos and day details.` : 'There are no other pages of this kind yet. Use Pages → Fill the rest of the year.');
+}
+
+/** Sets the calendar year (every page's dates change). Typing or stepping through years asks only once. */
+export async function setYear(y: number) {
+  if (y < 1900 || y > 2200) return;
+  const s = S();
+  const continuing = s.lastKey === 'doc:year' && Date.now() - s.lastAt < 1200;
+  if (!continuing && !(await confirmReplaceAll())) return;
+  S().mutate((d) => void (d.year = y), { key: 'doc:year' });
 }
 
 /** Changes the paper and stretches the design vertically to the new height. */

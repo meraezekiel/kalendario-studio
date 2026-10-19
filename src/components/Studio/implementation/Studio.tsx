@@ -6,6 +6,7 @@ import Drawer from'./Drawer/implementation/Drawer';
 import ExportBox from './ExportBox/implementation/ExportBox';
 import Inspector from './Inspector/implementation/Inspector';
 import PrintArea from './PrintArea/implementation/PrintArea';
+import ReplaceConfirm from './ReplaceConfirm/implementation/ReplaceConfirm';
 import Stage from './Stage/implementation/Stage';
 import Toast from './Toast/implementation/Toast';
 import ThanksNote from './ThanksNote/implementation/ThanksNote';
@@ -43,6 +44,7 @@ export default function Studio({ designId }: { designId?: string }) {
       <Toast />
       <ThanksNote />
       <CloudBanner cloud={!!designId} />
+      <ReplaceConfirm />
     </>
   );
 }

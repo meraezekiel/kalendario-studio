@@ -68,7 +68,7 @@ describe('studio store cloud hooks', () => {
   });
 
   it('historyDriver takes over undo/redo and mutate records no local history', () => {
-    const driver = { undo: vi.fn(), redo: vi.fn(), stop: vi.fn() };
+    const driver = { undo: vi.fn(() => true), redo: vi.fn(() => true), stop: vi.fn() };
     useStudioStore.setState({ historyDriver: driver });
     S().mutate((d) => void (d.year = 2041));
     S().checkpoint();
@@ -78,6 +78,25 @@ describe('studio store cloud hooks', () => {
     expect(driver.undo).toHaveBeenCalledOnce();
     expect(driver.redo).toHaveBeenCalledOnce();
     expect(S().doc.year).toBe(2041);
+  });
+
+  it('with a historyDriver, new steps stop capturing, merged keys and drags do not, and an empty stack toasts', () => {
+    const driver = { undo: vi.fn(() => false), redo: vi.fn(() => false), stop: vi.fn() };
+    const onLocal = vi.fn();
+    useStudioStore.setState({ historyDriver: driver, onLocalChange: onLocal });
+    S().mutate((d) => void (d.year = 2041), { key: 'year' });
+    expect(driver.stop).toHaveBeenCalledTimes(1);
+    S().mutate((d) => void (d.year = 2042), { key: 'year' });
+    expect(driver.stop).toHaveBeenCalledTimes(1);
+    S().checkpoint();
+    expect(driver.stop).toHaveBeenCalledTimes(2);
+    S().mutate((d) => void (d.year = 2043), { history: false, inStep: true });
+    expect(driver.stop).toHaveBeenCalledTimes(2);
+    expect(onLocal).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), true);
+    S().mutate((d) => void (d.holidays = !d.holidays), { history: false });
+    expect(onLocal).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), false);
+    S().undo();
+    expect(S().toast?.msg).toBe('Nothing to undo.');
   });
 
   it('applyRemote keeps cur (clamped), records no history and drops missing selections', () => {

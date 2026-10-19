@@ -8,7 +8,7 @@ import { CloudError } from '@/lib/cloud/transport';
 import { applyMyTemplate, isMyTemplate, makeMyTemplate, MY_TEMPLATES_KEY, type MyTemplate } from '@/lib/templates/myTemplates';
 import { PHOTO_SPACE_FULL, skippedPhotosNote } from './actions';
 import { useAuthStore } from './useAuthStore';
-import { useCloudStore } from './useCloudStore';
+import { confirmReplaceAll, useCloudStore } from './useCloudStore';
 import { toast, useStudioStore } from './useStudioStore';
 
 interface MyTemplatesState {
@@ -167,7 +167,7 @@ export const useMyTemplatesStore = create<MyTemplatesState>()((setState, getStat
   },
   apply: async (id) => {
     let t = getState().list.find((x) => x.id === id);
-    if (!t) return;
+    if (!t || !(await confirmReplaceAll())) return;
     const st = useStudioStore.getState();
     const designId = useCloudStore.getState().designId;
     let skipped = 0;

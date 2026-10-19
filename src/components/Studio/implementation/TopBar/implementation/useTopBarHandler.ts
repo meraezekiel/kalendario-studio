@@ -24,8 +24,10 @@ export function useTopBarHandler() {
     return `Page ${s.doc.cur + 1} of ${s.doc.pages.length} · ${MONTHS[m]}${role}`;
   });
   const readOnly = useStudioStore((s) => s.readOnly);
-  const canUndo = useStudioStore((s) => !s.readOnly && s.past.length > 0);
-  const canRedo = useStudioStore((s) => !s.readOnly && s.future.length > 0);
+  const driven = useStudioStore((s) => s.historyDriver !== null);
+  const undoable = useCloudStore((s) => s.undoable);
+  const canUndo = useStudioStore((s) => !s.readOnly && (driven ? undoable.undo : s.past.length > 0));
+  const canRedo = useStudioStore((s) => !s.readOnly && (driven ? undoable.redo : s.future.length > 0));
   const designId = useCloudStore((s) => s.designId);
   const role = useCloudStore((s) => (s.designId ? s.role : null));
   // Lost access: the banner offers the copy instead.
@@ -52,7 +54,7 @@ export function useTopBarHandler() {
     redo: () => st().redo(),
     prev: () => goToPage(st().doc.cur - 1),
     next: () => goToPage(st().doc.cur + 1),
-    sync: applyDesignToAll,
+    sync: () => void applyDesignToAll(),
     printOne: () => printPages(false),
     printAll: () => printPages(true),
     png: exportPNG,

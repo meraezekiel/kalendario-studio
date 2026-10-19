@@ -3,6 +3,7 @@
 import ConfirmButton from '@/components/ConfirmButton/implementation/ConfirmButton';
 import ShareDialog from '@/components/ShareDialog/implementation/ShareDialog';
 import AccountMenu from '../../AccountMenu/implementation/AccountMenu';
+import Presence from '../../Presence/implementation/Presence';
 import CloudBar from './CloudBar/implementation/CloudBar';
 import { useTopBarHandler } from './useTopBarHandler';
 
@@ -40,6 +41,7 @@ export default function TopBar() {
           <button className="btn" onClick={h.png}>PNG</button>
         </span>
       )}
+      {h.cloud && <Presence />}
       {h.owner && <button className="btn" onClick={h.openShare} title="Share this design with people by email">Share</button>}
       <AccountMenu />
       {h.sharing && h.designId && <ShareDialog designId={h.designId} onClose={h.closeShare} />}

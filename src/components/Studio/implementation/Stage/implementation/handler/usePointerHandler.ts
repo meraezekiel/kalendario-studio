@@ -67,7 +67,7 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
   const liveDoc = (d: Drag, recipe: (doc: CalendarDoc) => void) => {
     const st = S();
     if (!d.started) { st.checkpoint(); d.started = true; }
-    st.mutate(recipe, { history: false });
+    st.mutate(recipe, { history: false, inStep: true });
   };
   const live = (d: Drag, recipe: (el: El) => void) => liveDoc(d, (doc) => { const el = findEl(doc, d.id); if (el) recipe(el); });
 

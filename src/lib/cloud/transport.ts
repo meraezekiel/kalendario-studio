@@ -53,6 +53,7 @@ async function run<T>(call: PromiseLike<{ data: T; error: unknown }>): Promise<T
 /** Sync transport over Supabase: RPCs for load/compact, a table insert per push, a private realtime channel. */
 export class SupabaseTransport implements SyncTransport {
   private ch: RealtimeChannel | null = null;
+  private pres: { key: string; onSync: (state: Record<string, unknown[]>) => void } | null = null;
 
   constructor(readonly designId: string, readonly userId: string, private client: SupabaseClient = supabase()) {}
 
@@ -77,10 +78,24 @@ export class SupabaseTransport implements SyncTransport {
     return (await run(this.client.rpc('compact_design', { d: this.designId, new_state: state, through }))) === true;
   }
 
+  /**
+   * Takes part in the design channel's presence as `key` (one per tab); call before `subscribe`. `onSync`
+   * gets the whole presence state whenever anyone joins, leaves or changes what they track.
+   */
+  presence(key: string, onSync: (state: Record<string, unknown[]>) => void): void {
+    this.pres = { key, onSync };
+  }
+
   subscribe(onUpdate: (u: { id: number; data: string; author: string }) => void, onStatus: (s: 'live' | 'offline') => void) {
-    const ch = this.client.channel(`design:${this.designId}`, { config: { private: true } });
+    const pres = this.pres;
+    const ch = this.client.channel(`design:${this.designId}`, { config: { private: true, ...(pres ? { presence: { key: pres.key } } : {}) } });
     this.ch = ch;
     let closed = false;
+    if (pres) {
+      ch.on('presence', { event: 'sync' }, () => {
+        if (!closed) pres.onSync(ch.presenceState() as Record<string, unknown[]>);
+      });
+    }
     // SUBSCRIBED arrives before the server is listening to Postgres; an insert in that gap would be
     // missed, and the engine reloads on 'live', so 'live' waits for the "Subscribed to PostgreSQL" notice.
     let joined = false;

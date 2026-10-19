@@ -21,7 +21,13 @@ const READ_ONLY_TOAST_MS = 3000;
 let readOnlyToastAt = -Infinity;
 
 /** Undo/redo kept outside the store (shared designs: per-person undo over the Y.Doc). */
-export interface HistoryDriver { undo(): void; redo(): void; stop(): void }
+export interface HistoryDriver {
+  /** False when there was nothing to undo. */
+  undo(): boolean;
+  redo(): boolean;
+  /** Ends the current undo step. */
+  stop(): void;
+}
 
 export function freshDoc(template = 'pastel'): CalendarDoc {
   const doc: CalendarDoc = { v: 3, year: new Date().getFullYear() + 1, holidays: true, cur: 0, assets: {}, tray: [], pages: TEMPLATES[template].make() };
@@ -59,11 +65,14 @@ interface StudioState {
   readOnly: boolean;
   /** When set, history is kept elsewhere: `mutate`/`checkpoint` skip past/future and undo/redo delegate. */
   historyDriver: HistoryDriver | null;
-  /** Called after every change the user makes (mutate, local undo/redo); `tracked` is false for history:false changes. */
+  /** Called after every change the user makes (mutate, local undo/redo); `tracked` is false for history:false changes outside a step. */
   onLocalChange: ((prev: CalendarDoc, next: CalendarDoc, tracked: boolean) => void) | null;
 
-  /** Changes the document. Records an undo step unless `key` matches the previous change (typing, sliders). */
-  mutate: (recipe: (doc: CalendarDoc) => void, opts?: { key?: string; history?: boolean }) => void;
+  /**
+   * Changes the document. Records an undo step unless `key` matches the previous change (typing, sliders).
+   * `history: false` records none; with `inStep` the change still belongs to the step the last `checkpoint` opened (drags).
+   */
+  mutate: (recipe: (doc: CalendarDoc) => void, opts?: { key?: string; history?: boolean; inStep?: boolean }) => void;
   /** Records the current document as an undo step (used before a drag). */
   checkpoint: () => void;
   undo: () => void;
@@ -106,7 +115,7 @@ export const useStudioStore = create<StudioState>()(
     onLocalChange: null,
 
     mutate: (recipe, opts = {}) => {
-      const { key, history = true } = opts;
+      const { key, history = true, inStep = false } = opts;
       const now = Date.now();
       const s = get();
       if (s.readOnly) {
@@ -118,6 +127,7 @@ export const useStudioStore = create<StudioState>()(
       }
       const merge = !!key && key === s.lastKey && now - s.lastAt < MERGE_MS;
       const before = s.doc;
+      if (history && !merge) s.historyDriver?.stop();
       set((st) => {
         recipe(st.doc);
         if (history && !merge && !s.historyDriver) {
@@ -129,13 +139,15 @@ export const useStudioStore = create<StudioState>()(
         st.lastAt = now;
       });
       const after = get().doc;
-      if (after !== before) get().onLocalChange?.(before, after, history !== false);
+      if (after !== before) get().onLocalChange?.(before, after, history || inStep);
     },
 
     checkpoint: () =>
       set((st) => {
         if (get().readOnly) return; // a viewer's drag must not create an undo step
-        if (!get().historyDriver) {
+        const driver = get().historyDriver;
+        if (driver) driver.stop();
+        else {
           st.past.push(get().doc);
           if (st.past.length > HISTORY_LIMIT) st.past.shift();
           st.future = [];
@@ -146,7 +158,10 @@ export const useStudioStore = create<StudioState>()(
     undo: () => {
       const s = get();
       if (s.readOnly) return; // undo would write to a view-only design
-      if (s.historyDriver) return s.historyDriver.undo();
+      if (s.historyDriver) {
+        if (!s.historyDriver.undo()) s.showToast('Nothing to undo.');
+        return;
+      }
       if (!s.past.length) return s.showToast('Nothing to undo.');
       const prev = s.past[s.past.length - 1];
       set((st) => {
@@ -162,7 +177,7 @@ export const useStudioStore = create<StudioState>()(
     redo: () => {
       const s = get();
       if (s.readOnly) return;
-      if (s.historyDriver) return s.historyDriver.redo();
+      if (s.historyDriver) return void s.historyDriver.redo();
       if (!s.future.length) return;
       const next = s.future[s.future.length - 1];
       set((st) => {

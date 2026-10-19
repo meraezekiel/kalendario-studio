@@ -20,7 +20,7 @@ function fakeClient() {
     status('SUBSCRIBED');
     handlers.system({ extension: 'postgres_changes', status: 'ok' });
   };
-  return { client, goLive, insert: (row: unknown) => handlers.postgres_changes({ new: row }) };
+  return { client, goLive, insert: (row: unknown) => handlers.postgres_changes({ new: row }), presence: () => handlers.presence({}) };
 }
 
 describe('SupabaseTransport.subscribe', () => {
@@ -53,6 +53,23 @@ describe('SupabaseTransport.subscribe', () => {
     const t = await live(vi.fn(() => { throw new Error('bad update'); }));
     expect(() => t.insert({ id: 9, data: 'AA==', author: 'u' })).not.toThrow();
     expect(t.statuses).toEqual(['live', 'offline', 'live']);
+  });
+
+  it('joins presence on the same channel with the given key and reports the state', async () => {
+    const f = fakeClient();
+    const state = { k2: [{ uid: 'u2' }] };
+    let opts: unknown;
+    const ch = f.client.channel('x') as unknown as Record<string, unknown>;
+    ch.presenceState = () => state;
+    (f.client as unknown as { channel: unknown }).channel = (_n: string, o: unknown) => { opts = o; return ch; };
+    const t = new SupabaseTransport('d', 'me', f.client);
+    const seen: unknown[] = [];
+    t.presence('k1', (s) => seen.push(s));
+    t.subscribe(() => {}, () => {});
+    expect(opts).toEqual({ config: { private: true, presence: { key: 'k1' } } });
+    expect(t.channel()).toBe(ch);
+    f.presence();
+    expect(seen).toEqual([state]);
   });
 });
 

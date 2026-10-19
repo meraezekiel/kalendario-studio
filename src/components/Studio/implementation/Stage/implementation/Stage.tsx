@@ -1,6 +1,7 @@
 'use client';
 
 import PageView from '@/components/PageView/implementation/PageView';
+import OthersOverlay from './OthersOverlay/implementation/OthersOverlay';
 import PageBar from './PageBar/implementation/PageBar';
 import SelectionOverlay from './SelectionOverlay/implementation/SelectionOverlay';
 import { useStageHandler } from './useStageHandler';
@@ -25,6 +26,7 @@ export default function Stage() {
         <div className="scaler" style={scalerStyle}>
           <div className="ph" ref={phRef} style={phStyle}>
             <PageView page={page} edit />
+            <OthersOverlay />
             {!readOnly && <SelectionOverlay />}
           </div>
         </div>
