@@ -81,11 +81,6 @@ export class SupabaseTransport implements SyncTransport {
     const ch = this.client.channel(`design:${this.designId}`, { config: { private: true } });
     this.ch = ch;
     let closed = false;
-    ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'design_updates', filter: `design_id=eq.${this.designId}` }, (p) => {
-      if (closed) return;
-      const r = p.new as { id: number | string; data: string; author: string };
-      onUpdate({ id: Number(r.id), data: r.data, author: r.author });
-    });
     // SUBSCRIBED arrives before the server is listening to Postgres; an insert in that gap would be
     // missed, and the engine reloads on 'live', so 'live' waits for the "Subscribed to PostgreSQL" notice.
     let joined = false;
@@ -97,6 +92,25 @@ export class SupabaseTransport implements SyncTransport {
       reported = s;
       onStatus(s);
     };
+    // An update we couldn't deliver: blip offline -> live, so the engine reloads it via load().
+    // When not live yet, the coming 'live' reloads anyway.
+    const resync = () => {
+      if (reported !== 'live') return;
+      report('offline');
+      report('live');
+    };
+    ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'design_updates', filter: `design_id=eq.${this.designId}` }, (p) => {
+      if (closed) return;
+      // Realtime drops columns from oversized records (~1 MB), so `data` may be missing.
+      const r = (p?.new ?? {}) as { id?: unknown; data?: unknown; author?: unknown };
+      const id = Number(r.id);
+      if (typeof r.data !== 'string' || r.id == null || !Number.isFinite(id)) return resync();
+      try {
+        onUpdate({ id, data: r.data, author: typeof r.author === 'string' ? r.author : '' });
+      } catch {
+        resync();
+      }
+    });
     const settle = () => {
       if (joined && listening) {
         if (fallback) clearTimeout(fallback);

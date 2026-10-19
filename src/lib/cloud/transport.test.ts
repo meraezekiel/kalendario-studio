@@ -1,5 +1,60 @@
-import { describe, expect, it } from 'vitest';
-import { CloudError, toCloudError } from './transport';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { describe, expect, it, vi } from 'vitest';
+import { CloudError, SupabaseTransport, toCloudError } from './transport';
+
+/** A fake client whose one channel lets the test fire realtime events by hand. */
+function fakeClient() {
+  const handlers: Record<string, (p: unknown) => void> = {};
+  let status: (s: string) => void = () => {};
+  const ch = {
+    on(type: string, _f: unknown, cb: (p: unknown) => void) { handlers[type] = cb; return ch; },
+    subscribe(cb: (s: string) => void) { status = cb; return ch; },
+  };
+  const client = {
+    channel: () => ch,
+    realtime: { setAuth: async () => {} },
+    removeChannel: async () => 'ok',
+  } as unknown as SupabaseClient;
+  const goLive = async () => {
+    await new Promise((r) => setTimeout(r, 0)); // subscribe() happens after setAuth resolves
+    status('SUBSCRIBED');
+    handlers.system({ extension: 'postgres_changes', status: 'ok' });
+  };
+  return { client, goLive, insert: (row: unknown) => handlers.postgres_changes({ new: row }) };
+}
+
+describe('SupabaseTransport.subscribe', () => {
+  async function live(onUpdate: (u: { id: number; data: string; author: string }) => void = () => {}) {
+    const f = fakeClient();
+    const statuses: string[] = [];
+    const updates: unknown[] = [];
+    new SupabaseTransport('d', 'me', f.client).subscribe((u) => { updates.push(u); onUpdate(u); }, (s) => statuses.push(s));
+    await f.goLive();
+    expect(statuses).toEqual(['live']);
+    return { ...f, statuses, updates };
+  }
+
+  it('delivers a well-formed insert', async () => {
+    const t = await live();
+    t.insert({ id: 7, data: 'AA==', author: 'u' });
+    expect(t.updates).toEqual([{ id: 7, data: 'AA==', author: 'u' }]);
+    expect(t.statuses).toEqual(['live']);
+  });
+
+  it('resyncs (offline then live) when realtime drops data from an oversized record', async () => {
+    const t = await live();
+    expect(() => t.insert({ id: 8, author: 'u' })).not.toThrow();
+    expect(() => t.insert({ data: 'AA==', author: 'u' })).not.toThrow();
+    expect(t.updates).toEqual([]);
+    expect(t.statuses).toEqual(['live', 'offline', 'live', 'offline', 'live']);
+  });
+
+  it('resyncs instead of throwing when applying an update fails', async () => {
+    const t = await live(vi.fn(() => { throw new Error('bad update'); }));
+    expect(() => t.insert({ id: 9, data: 'AA==', author: 'u' })).not.toThrow();
+    expect(t.statuses).toEqual(['live', 'offline', 'live']);
+  });
+});
 
 describe('toCloudError', () => {
   const code = (e: unknown) => {
