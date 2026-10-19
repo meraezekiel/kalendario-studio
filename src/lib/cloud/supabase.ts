@@ -15,7 +15,8 @@ export function cloudEnabled(): boolean {
 export function supabase(): SupabaseClient {
   if (!client) {
     if (!url || !anonKey) throw new Error('Supabase is not configured (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY)');
-    client = createClient(url, anonKey);
+    // PKCE: email links come back to /auth/callback with ?code=, which that page exchanges itself.
+    client = createClient(url, anonKey, { auth: { flowType: 'pkce', detectSessionInUrl: false } });
   }
   return client;
 }

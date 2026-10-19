@@ -1,6 +1,7 @@
 'use client';
 
 import ConfirmButton from '@/components/ConfirmButton/implementation/ConfirmButton';
+import AccountMenu from '../../AccountMenu/implementation/AccountMenu';
 import { useTopBarHandler } from './useTopBarHandler';
 
 export default function TopBar() {
@@ -33,6 +34,7 @@ export default function TopBar() {
           <button className="btn" onClick={h.png}>PNG</button>
         </span>
       )}
+      <AccountMenu />
     </header>
   );
 }
