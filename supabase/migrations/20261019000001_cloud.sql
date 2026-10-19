@@ -89,6 +89,12 @@ as $$
     then substring(topic from 8)::uuid end
 $$;
 
+-- Whether bucket 'photos' holds an object at `path` (definer: storage RLS would hide it).
+create function public.photo_object_exists(path text)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$ select exists (select 1 from storage.objects o where o.bucket_id = 'photos' and o.name = path) $$;
+
 -- ---------------------------------------------------------------- RPCs
 
 -- Compacted state plus the updates after it, read in one statement (one snapshot). RLS applies.
@@ -206,6 +212,11 @@ begin
   if new.bytes > lim.file_bytes then
     raise exception 'photo too large' using errcode = 'P0001';
   end if;
+  -- A row must come before its object; otherwise a re-inserted row could under-declare an
+  -- existing object's size, or claim someone else's orphaned object.
+  if public.photo_object_exists(new.path) then
+    raise exception 'photo object already exists' using errcode = '23505';
+  end if;
   perform pg_advisory_xact_lock(hashtext('photos:' || new.owner::text));
   select coalesce(sum(p.bytes), 0) into used from public.photos p where p.owner = new.owner;
   if used + new.bytes > lim.photo_bytes then
@@ -302,11 +313,13 @@ create policy photos_insert on public.photos for insert to authenticated
     or (template_id is not null and exists (
       select 1 from public.templates t where t.id = template_id and t.owner = auth.uid()))
   );
--- Delete the storage object first, then this row: the object's delete policy needs the row.
+-- Delete the storage object first, then this row: the object's delete policy needs the row, and
+-- the row can't go while its object exists (so the object's bytes stay counted).
 create policy photos_delete on public.photos for delete to authenticated
   using (
-    public.design_role(design_id) in ('owner', 'editor')
-    or (template_id is not null and owner = auth.uid())
+    (public.design_role(design_id) in ('owner', 'editor')
+      or (template_id is not null and owner = auth.uid()))
+    and not public.photo_object_exists(path)
   );
 
 -- ---------------------------------------------------------------- realtime

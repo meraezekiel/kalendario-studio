@@ -339,6 +339,11 @@ describe('storage', () => {
     expect(await count('photos', 'design_id', design.id)).toBe(2);
     expect((await owner.storage.from('photos').download(a.path)).error).toBeNull();
 
+    // The row can't go while its object exists, so the object's bytes stay counted.
+    const early = await owner.from('photos').delete().eq('path', a.path).select();
+    expect(early.data ?? []).toHaveLength(0);
+    expect(await count('photos', 'path', a.path)).toBe(1);
+
     const objA = await owner.storage.from('photos').remove([a.path]);
     expect(objA.data).toHaveLength(1);
     expect((await owner.from('photos').delete().eq('path', a.path).select()).data).toHaveLength(1);
@@ -348,6 +353,23 @@ describe('storage', () => {
     expect(objB.data).toHaveLength(1);
     expect((await editor.from('photos').delete().eq('path', b.path).select()).data).toHaveLength(1);
     expect((await owner.rpc('photo_usage')).data).toBe(0);
+  });
+
+  it('a photos row cannot be inserted for a path whose object already exists', async () => {
+    const { owner, editor, design } = await cast();
+    const p = await addPhoto(owner, design.id, 100);
+    expect(p.error).toBeNull();
+    try {
+      // Even with the original row gone (admin), re-inserting at that path is refused.
+      expect((await admin.from('photos').delete().eq('path', p.path)).error).toBeNull();
+      const again = await owner.from('photos').insert({ path: p.path, design_id: design.id, bytes: 1 });
+      expect(again.error?.message).toContain('photo object already exists');
+      const claim = await editor.from('photos').insert({ path: p.path, design_id: design.id, bytes: 1 });
+      expect(claim.error).not.toBeNull();
+      expect((await owner.storage.from('photos').download(p.path)).error).not.toBeNull();
+    } finally {
+      await admin.storage.from('photos').remove([p.path]);
+    }
   });
 
   it('quota counts the uploaded size, not the declared bytes', async () => {
