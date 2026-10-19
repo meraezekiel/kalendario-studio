@@ -37,13 +37,25 @@ function toY(key: string, v: unknown): unknown {
   return v;
 }
 
-function fromY(v: unknown): unknown {
+function fromY(v: unknown, key = ''): unknown {
   if (v instanceof Y.Map) {
     const o: Obj = {};
-    v.forEach((val, k) => { o[k] = fromY(val); });
+    v.forEach((val, k) => { o[k] = fromY(val, k); });
     return o;
   }
-  if (v instanceof Y.Array) return v.toArray().map(fromY);
+  if (v instanceof Y.Array) {
+    const items = v.toArray().map((x) => fromY(x));
+    if (!ID_ARRAYS.has(key)) return items;
+    // Two people moving the same item at once each re-insert it: show it once (its first place).
+    const seen = new Set<unknown>();
+    return items.filter((o) => {
+      const id = isObj(o) ? o.id : undefined;
+      if (id === undefined) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }
   return v;
 }
 
@@ -51,6 +63,12 @@ function diffIdArray(arr: Y.Array<Y.Map<unknown>>, prev: Obj[], next: Obj[]) {
   const prevById = new Map(prev.map((e) => [e.id as string, e]));
   const nextIds = new Set(next.map((e) => e.id as string));
   const idAt = (i: number) => arr.get(i).get('id') as string;
+  // A second copy of an item (two people moved it at once) goes: readDoc only ever shows the first.
+  const ids = new Set<string>();
+  for (let i = 0; i < arr.length; i++) {
+    if (ids.has(idAt(i))) arr.delete(i--, 1);
+    else ids.add(idAt(i));
+  }
   // Items neither side knew about (a collaborator's, not yet merged locally) are left alone.
   const known = (i: number) => prevById.has(idAt(i)) || nextIds.has(idAt(i));
   for (let i = arr.length - 1; i >= 0; i--) if (prevById.has(idAt(i)) && !nextIds.has(idAt(i))) arr.delete(i, 1);

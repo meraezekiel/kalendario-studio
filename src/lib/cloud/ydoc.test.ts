@@ -187,6 +187,50 @@ describe('ydoc', () => {
     undo.destroy();
   });
 
+  it('concurrent moves of the same element never read back as two elements', () => {
+    const doc = mkDoc();
+    const [a, b] = pair(doc);
+    const id = doc.pages[0].els[0].id;
+    // Both move the first element: one to the end, the other one step down.
+    applyDiff(a, doc, edit(doc, (d) => { d.pages[0].els.push(d.pages[0].els.shift()!); }));
+    applyDiff(b, doc, edit(doc, (d) => { const [e] = d.pages[0].els.splice(0, 1); d.pages[0].els.splice(1, 0, e); }));
+    sync(a, b);
+    for (const y of [a, b]) {
+      const raw = ((y.getMap(ROOT).get('pages') as Y.Array<Y.Map<unknown>>).get(0).get('els') as Y.Array<Y.Map<unknown>>).toArray();
+      expect(raw.filter((m) => m.get('id') === id).length).toBe(2); // the Y.Array really holds both
+      const ids = readDoc(y)!.pages[0].els.map((e) => e.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).toContain(id);
+      expect(ids.length).toBe(doc.pages[0].els.length);
+    }
+    expect(readDoc(a)).toEqual(readDoc(b));
+    // The next edit drops the extra copy and lands on the one shown.
+    const shown = { ...clone(readDoc(a)!), cur: 0 } as CalendarDoc;
+    const idx = shown.pages[0].els.findIndex((e) => e.id === id);
+    applyDiff(a, shown, edit(shown, (d) => { d.pages[0].els[idx].x = 999; }));
+    sync(a, b);
+    const els = readDoc(b)!.pages[0].els;
+    expect(els.length).toBe(doc.pages[0].els.length);
+    expect(els.find((e) => e.id === id)!.x).toBe(999);
+    const raw = ((b.getMap(ROOT).get('pages') as Y.Array<Y.Map<unknown>>).get(0).get('els') as Y.Array<Y.Map<unknown>>).toArray();
+    expect(raw.length).toBe(doc.pages[0].els.length);
+  });
+
+  it('concurrent moves of the same page never read back as two pages', () => {
+    const doc = mkDoc();
+    doc.pages = ['p1', 'p2', 'p3'].map((id) => ({ ...clone(doc.pages[0]), id }));
+    const [a, b] = pair(doc);
+    applyDiff(a, doc, edit(doc, (d) => { d.pages.push(d.pages.shift()!); }));
+    applyDiff(b, doc, edit(doc, (d) => { const [p] = d.pages.splice(0, 1); d.pages.splice(1, 0, p); }));
+    sync(a, b);
+    const raw = (a.getMap(ROOT).get('pages') as Y.Array<Y.Map<unknown>>).toArray();
+    expect(raw.length).toBe(doc.pages.length + 1); // the Y.Array really holds the page twice
+    const ids = readDoc(a)!.pages.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.length).toBe(doc.pages.length);
+    expect(readDoc(a)).toEqual(readDoc(b));
+  });
+
   it('toB64/fromB64 round-trip', () => {
     const u = new Uint8Array(70000).map((_, i) => i % 256);
     expect(fromB64(toB64(u))).toEqual(u);
