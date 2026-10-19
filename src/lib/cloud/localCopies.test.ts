@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { forgetLocalCopies, rememberLocalCopy, TRACK_KEY } from './localCopies';
+import { forgetLocalCopies, hasLocalCopy, rememberLocalCopy, TRACK_KEY } from './localCopies';
 
 function fakeStorage() {
   const m = new Map<string, string>();
@@ -60,5 +60,25 @@ describe('forgetLocalCopies', () => {
     await vi.advanceTimersByTimeAsync(3000);
     await done;
     expect(deleted).toEqual(['kal-design-a']);
+  });
+});
+
+describe('hasLocalCopy', () => {
+  it('finds a copy listed by indexedDB.databases()', async () => {
+    vi.stubGlobal('indexedDB', fakeIdb(['kal-design-a', 'keyval-store']).idb);
+    expect(await hasLocalCopy('a')).toBe(true);
+    expect(await hasLocalCopy('b')).toBe(false);
+  });
+
+  it('falls back to the tracked ids', async () => {
+    vi.stubGlobal('indexedDB', fakeIdb([], { databases: false }).idb);
+    rememberLocalCopy('x');
+    expect(await hasLocalCopy('x')).toBe(true);
+    expect(await hasLocalCopy('y')).toBe(false);
+  });
+
+  it('is false without IndexedDB', async () => {
+    rememberLocalCopy('x');
+    expect(await hasLocalCopy('x')).toBe(false);
   });
 });

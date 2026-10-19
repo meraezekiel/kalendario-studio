@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { AuthError, User } from '@supabase/supabase-js';
 import { safeNext } from '@/lib/cloud/safeNext';
+import { dirtyDesigns, type DirtyDesign, forgetDirty, isDirty } from '@/lib/cloud/dirty';
 import { forgetLocalCopies } from '@/lib/cloud/localCopies';
 import { cloudEnabled, supabase } from '@/lib/cloud/supabase';
 import { saveAll, useCloudStore } from './useCloudStore';
@@ -29,7 +30,7 @@ interface AuthState {
   /**
    * Signs out, then deletes this account's data from the browser (offline design copies, downloaded
    * photos, templates). With unsaved cloud edits (and no `force`) it asks first instead: `unsynced`
-   * becomes 'ask'. Resolves true once signed out (the caller then routes to `/`), false when it asked.
+   * becomes 'ask'. That covers the open design and any other with edits only this browser holds. Resolves true once signed out (the caller then routes to `/`), false when it asked.
    * Never rejects: offline, the session here is cleared anyway.
    */
   signOut(opts?: { force?: boolean }): Promise<boolean>;
@@ -39,6 +40,8 @@ interface AuthState {
   cancelSignOut(): void;
   /** The sign-out question about unsaved edits: asked, saving them, or saving timed out. */
   unsynced: 'ask' | 'waiting' | 'stuck' | null;
+  /** With the question: designs not open here whose edits haven't reached the account ("Wait" can't send those). */
+  elsewhere: DirtyDesign[];
   /** True from signing out until the next sign-in: pages that need an account leave it to sign-out's routing. */
   leaving: boolean;
 }
@@ -50,6 +53,7 @@ export const SAVE_WAIT_MS = 15_000;
 async function forgetAccountData() {
   usePhotoUrlStore.getState().clear();
   useMyTemplatesStore.setState({ list: [], loaded: false, owner: null });
+  forgetDirty();
   await forgetLocalCopies();
 }
 
@@ -131,14 +135,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   unsynced: null,
+  elsewhere: [],
   leaving: false,
 
   async signOut(opts) {
-    if (!opts?.force && useCloudStore.getState().status.pending) {
-      set({ unsynced: 'ask' });
-      return false;
+    if (!opts?.force) {
+      const { status, designId } = useCloudStore.getState();
+      // Designs with unsent edits that aren't open here (closed tab, left for My designs): only opening
+      // them online sends those edits.
+      const elsewhere = dirtyDesigns().filter((d) => d.id !== designId);
+      if (status.pending || (designId && isDirty(designId)) || elsewhere.length) {
+        set({ unsynced: 'ask', elsewhere });
+        return false;
+      }
     }
-    set({ unsynced: null, leaving: true });
+    set({ unsynced: null, elsewhere: [], leaving: true });
     try {
       const { error } = await supabase().auth.signOut();
       // Offline (or the server is unreachable): forget the session in this browser anyway.
@@ -163,6 +174,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   cancelSignOut() {
-    set({ unsynced: null });
+    set({ unsynced: null, elsewhere: [] });
   },
 }));

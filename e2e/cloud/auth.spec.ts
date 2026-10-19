@@ -218,3 +218,65 @@ test('Wait saves unsynced changes once back online, then signs out', async ({ pa
   await page.goto(`/d/${id}`);
   await expect(page.locator('.ph .tx', { hasText: 'Saved while waiting' })).toBeVisible({ timeout: 15_000 });
 });
+
+test('sign out from My designs still asks about a design left with unsynced changes', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  const user = await newUser();
+  await signIn(page, user);
+  const id = await newDesign(page);
+  await expect(page.getByTestId('sync-state')).toHaveText('Saved');
+
+  // Supabase unreachable for edits: the change stays in this browser's copy of the design.
+  await page.route('**/rest/v1/design_updates**', (r) => r.abort('internetdisconnected'));
+  await addHeading(page, 'Left behind offline');
+  await expect(page.getByTestId('sync-state')).not.toHaveText('Saved');
+  await page.getByRole('link', { name: 'My designs' }).click();
+  await expect(page).toHaveURL(/\/designs$/);
+  await expect(page.locator(`[data-design-id="${id}"]`)).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('kal-design-dirty'))).toContain(id);
+
+  // Back online, but the design isn't open, so nothing sends the edit.
+  await page.unroute('**/rest/v1/design_updates**');
+  await startSignOut(page);
+  const dlg = page.getByRole('dialog', { name: "Some changes haven't synced yet." });
+  await expect(dlg).toBeVisible();
+  await expect(dlg).toContainText('Open “Untitled calendar” while online so it can sync.');
+  await expect(dlg.getByRole('button', { name: 'Wait' })).toHaveCount(0);
+  await expect(dlg.getByRole('button', { name: 'Sign out anyway' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
+
+  // Opening it sends the edit; then sign-out no longer asks.
+  await dlg.getByRole('button', { name: 'Open design' }).click();
+  await expect(page).toHaveURL(new RegExp(`/d/${id}$`));
+  await expect(page.locator('.ph .tx', { hasText: 'Left behind offline' })).toBeVisible();
+  await expect(page.getByTestId('sync-state')).toHaveText('Saved', { timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('kal-design-dirty'))).toBeNull();
+  await page.getByRole('link', { name: 'My designs' }).click();
+  await expect(page).toHaveURL(/\/designs$/);
+  await startSignOut(page);
+  await expect(page).toHaveURL(/localhost:3101\/$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('Sign out anyway from My designs forgets the unsynced design list', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  const user = await newUser();
+  await signIn(page, user);
+  const id = await newDesign(page);
+  await expect(page.getByTestId('sync-state')).toHaveText('Saved');
+  await page.route('**/rest/v1/design_updates**', (r) => r.abort('internetdisconnected'));
+  await addHeading(page, 'Let go');
+  await expect(page.getByTestId('sync-state')).not.toHaveText('Saved');
+  await page.getByRole('link', { name: 'My designs' }).click();
+  await expect(page).toHaveURL(/\/designs$/);
+  await startSignOut(page);
+  const dlg = page.getByRole('dialog', { name: "Some changes haven't synced yet." });
+  await dlg.getByRole('button', { name: 'Sign out anyway' }).click();
+  await expect(page).toHaveURL(/localhost:3101\/$/);
+  await expect.poll(() => designDbs(page), { timeout: 10_000 }).not.toContain(`kal-design-${id}`);
+  expect(await page.evaluate(() => localStorage.getItem('kal-design-dirty'))).toBeNull();
+  expect(errors).toEqual([]);
+});

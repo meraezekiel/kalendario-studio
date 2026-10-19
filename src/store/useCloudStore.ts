@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { renameDesign, type Role } from '@/lib/cloud/designs';
+import { isDirty } from '@/lib/cloud/dirty';
 import { type Presence, whoElse } from '@/lib/cloud/presence';
 import type { SyncStatus } from '@/lib/cloud/sync';
 import { toast, useStudioStore } from './useStudioStore';
@@ -103,7 +104,12 @@ export function provideFlush(fn: () => Promise<void>): () => void {
  * saved. Resolves true once nothing is pending, false when time ran out (offline, say). Never rejects.
  */
 export async function saveAll(ms: number): Promise<boolean> {
-  const saved = () => !useCloudStore.getState().status.pending;
+  // Edits from an earlier visit (opened offline) aren't pending until the server copy loads: the
+  // dirty list knows them.
+  const saved = () => {
+    const { status, designId } = useCloudStore.getState();
+    return !status.pending && !(designId && isDirty(designId));
+  };
   const until = Date.now() + ms;
   while (!saved()) {
     const left = until - Date.now();
@@ -114,7 +120,7 @@ export async function saveAll(ms: number): Promise<boolean> {
     if (saved()) break;
     await new Promise<void>((resolve) => {
       const t = setTimeout(done, Math.max(0, Math.min(until - Date.now(), 1000)));
-      const off = useCloudStore.subscribe((s) => !s.status.pending && done());
+      const off = useCloudStore.subscribe(() => saved() && done());
       function done() {
         clearTimeout(t);
         off();

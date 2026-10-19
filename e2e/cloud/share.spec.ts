@@ -246,6 +246,66 @@ test('removing access while the invitee has it open shows the access-lost banner
   await b.close();
 });
 
+test('edits made offline, tab closed, then access removed: reopening offers them as a copy', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const a = await browser.newContext({ storageState: ownerState });
+  const pa = await a.newPage();
+  const id = await newDesign(pa);
+  await addHeading(pa, 'Owner wrote this');
+  await expect(syncState(pa)).toHaveText('Saved');
+  const dlg = await shareTo(pa, editor.email, 'Can edit');
+
+  const b = await browser.newContext({ storageState: editorState });
+  const p1 = await b.newPage();
+  await openDesign(p1, id);
+  await expect(p1.locator('.ph .tx', { hasText: 'Owner wrote this' })).toBeVisible();
+  await expect(syncState(p1)).toHaveText('Saved');
+  await b.setOffline(true);
+  await addHeading(p1, 'Written offline');
+  await expect(syncState(p1)).toHaveText('Offline, changes kept on this computer', { timeout: 15_000 });
+  await p1.close();
+  await b.setOffline(false);
+
+  await dlg.getByTestId('member').filter({ hasText: editor.email }).getByRole('button', { name: 'Remove' }).click();
+  await expect(dlg.getByTestId('member')).toHaveCount(0);
+
+  // Back online with no access: this browser's copy shows, view only, with the way out.
+  const p2 = await b.newPage();
+  const errors = watchErrors(p2);
+  await p2.goto(`/d/${id}`);
+  const banner = p2.getByTestId('cloud-banner');
+  await expect(banner).toContainText('You no longer have access to this design.', { timeout: 15_000 });
+  await expect(p2.locator('.ph .tx', { hasText: 'Written offline' })).toBeVisible();
+  await expect(p2.locator('.app')).toHaveClass(/readonly/);
+  expect(await p2.evaluate(() => localStorage.getItem('kal-design-dirty'))).toContain(id);
+
+  await banner.getByRole('button', { name: 'Save as a copy in My designs' }).click();
+  await p2.waitForURL((u) => /\/d\/[0-9a-f-]{36}$/.test(u.pathname) && !u.pathname.endsWith(id));
+  await expect(p2.locator('.ph .tx', { hasText: 'Owner wrote this' })).toBeVisible();
+  await expect(p2.locator('.ph .tx', { hasText: 'Written offline' })).toBeVisible();
+  await expect(p2.getByLabel('Design name')).toHaveValue('Untitled calendar (copy)');
+  await expect(syncState(p2)).toHaveText('Saved');
+  expect(await p2.evaluate(() => localStorage.getItem('kal-design-dirty'))).toBeNull();
+  expect(errors).toEqual([]);
+  await a.close();
+  await b.close();
+});
+
+test('opening a design without access and without a copy here still says so', async ({ browser }) => {
+  const a = await browser.newContext({ storageState: ownerState });
+  const pa = await a.newPage();
+  const id = await newDesign(pa);
+  await a.close();
+  const b = await browser.newContext({ storageState: viewerState });
+  const pb = await b.newPage();
+  const errors = watchErrors(pb);
+  await pb.goto(`/d/${id}`);
+  await expect(pb.locator('.auth-card').getByRole('alert')).toHaveText("You don't have access to this design.");
+  await expect(pb.getByTestId('cloud-banner')).toHaveCount(0);
+  expect(errors).toEqual([]);
+  await b.close();
+});
+
 test('only owner sees Share and rename', async ({ browser }) => {
   const a = await browser.newContext({ storageState: ownerState });
   const pa = await a.newPage();

@@ -2,14 +2,16 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toJpeg } from 'html-to-image';
 import { IndexeddbPersistence } from 'y-indexeddb';
+import * as Y from 'yjs';
 import type { CalendarDoc } from '@/lib/calendar/types';
 import { getDesign, saveThumb } from '@/lib/cloud/designs';
-import { dbName, rememberLocalCopy } from '@/lib/cloud/localCopies';
+import { dirtyDesigns, followDirty, isDirty, markClean, markDirty } from '@/lib/cloud/dirty';
+import { dbName, hasLocalCopy, rememberLocalCopy } from '@/lib/cloud/localCopies';
 import { colorFor, type PresencePayload, readOthers } from '@/lib/cloud/presence';
 import { DesignSync, type SyncStatus } from '@/lib/cloud/sync';
 import { SupabaseTransport } from '@/lib/cloud/transport';
 import { makeUndoDriver } from '@/lib/cloud/undo';
-import type { SharedDoc } from '@/lib/cloud/ydoc';
+import { readDoc, type SharedDoc } from '@/lib/cloud/ydoc';
 import { useAuthStore } from '@/store/useAuthStore';
 import { provideFlush, useCloudStore } from '@/store/useCloudStore';
 import { freshDoc, selIds, useStudioStore } from '@/store/useStudioStore';
@@ -83,6 +85,25 @@ async function jpeg(node: HTMLElement): Promise<string | null> {
 }
 
 /**
+ * This browser's offline copy of design `designId`, read without syncing it, or null when there's none.
+ * The copy itself stays (until sign-out).
+ */
+async function readLocalCopy(designId: string): Promise<SharedDoc | null> {
+  if (!(await hasLocalCopy(designId))) return null;
+  const y = new Y.Doc();
+  const p = new IndexeddbPersistence(dbName(designId), y);
+  try {
+    await p.whenSynced;
+    return readDoc(y);
+  } catch {
+    return null;
+  } finally {
+    await p.destroy().catch(() => {});
+    y.destroy();
+  }
+}
+
+/**
  * Opens cloud design `designId` in the editor: checks access, loads it through the sync engine (with an
  * offline copy in IndexedDB), sends local edits, applies everyone else's, and keeps a thumbnail fresh.
  */
@@ -123,6 +144,7 @@ export function useCloudSessionHandler(designId: string) {
     const learned = (info: NonNullable<Awaited<ReturnType<typeof getDesign>>>) => {
       const cloud = useCloudStore.getState();
       cloud.patch({ name: info.name, role: info.role });
+      if (isDirty(designId)) markDirty(designId, info.name); // so sign-out can name it
       thumb.current = info.thumb;
       if (cloud.status.state === 'denied') return;
       canWrite.current = info.role === 'owner' || info.role === 'editor';
@@ -143,6 +165,8 @@ export function useCloudSessionHandler(designId: string) {
       }
     };
     const onStatus = (status: SyncStatus) => {
+      // First, so whoever follows the status (sign-out's "Wait") sees the design's edits as sent.
+      followDirty(designId, useCloudStore.getState().name, status);
       useCloudStore.getState().patch({ status });
       if (status.state === 'denied') {
         // Access went (or never was): nothing more can be saved, so stop editing.
@@ -168,6 +192,14 @@ export function useCloudSessionHandler(designId: string) {
       }
       if (cancelled) return;
       if (info === null) {
+        // No access (any more), or the design is gone. Edits made here offline are still in this
+        // browser's copy: show it, view only, so the access-lost banner can save it as a copy.
+        const copy = await readLocalCopy(designId);
+        if (cancelled) return;
+        if (copy) {
+          useCloudStore.getState().patch({ name: dirtyDesigns().find((d) => d.id === designId)?.name ?? '' });
+          show(copy);
+        }
         useCloudStore.getState().patch({ status: { state: 'denied', pending: false } });
         return;
       }
@@ -229,7 +261,15 @@ export function useCloudSessionHandler(designId: string) {
       useStudioStore.setState({ ready: false });
       useCloudStore.getState().begin(null);
       const s = sync;
-      if (s) void started.catch(() => {}).then(() => s.stop());
+      if (s) {
+        void started
+          .catch(() => {})
+          .then(() => s.stop())
+          .then(() => {
+            // stop() sends what's left: once it all arrived, nothing of this design is unsent.
+            if (s.status.state === 'live' && !s.status.pending) markClean(designId);
+          });
+      }
     };
   }, [authReady, userId, designId, router]);
 

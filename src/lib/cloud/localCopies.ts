@@ -28,6 +28,18 @@ export function rememberLocalCopy(designId: string): void {
   }
 }
 
+/** True when this browser holds an offline copy of design `designId` (checked without creating one). */
+export async function hasLocalCopy(designId: string): Promise<boolean> {
+  if (typeof indexedDB === 'undefined') return false;
+  try {
+    const dbs = await indexedDB.databases?.();
+    if (dbs) return dbs.some((d) => d.name === dbName(designId));
+  } catch {
+    // not supported: fall back to the tracked ids
+  }
+  return tracked().includes(designId);
+}
+
 function remove(name: string): Promise<void> {
   return new Promise((resolve) => {
     try {

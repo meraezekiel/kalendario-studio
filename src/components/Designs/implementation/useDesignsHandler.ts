@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createDesign, type DesignRow, listMine, listShared, removeDesign, renameDesign } from '@/lib/cloud/designs';
+import { markClean } from '@/lib/cloud/dirty';
 import { DESIGNS_FULL, MAX_DESIGNS } from '@/lib/cloud/limits';
 import { cloudEnabled } from '@/lib/cloud/supabase';
 import { CloudError } from '@/lib/cloud/transport';
@@ -81,6 +82,7 @@ export function useDesignsHandler() {
     setError('');
     try {
       await removeDesign(id);
+      markClean(id); // its unsent edits went with it
       setMine((list) => list?.filter((d) => d.id !== id) ?? null);
     } catch {
       setError('Could not delete the design. Please try again.');

@@ -658,9 +658,10 @@ let copying = false;
 /**
  * Saves what's open of the cloud design (as this tab has it, so it works after access is gone) as a
  * new design in My designs and goes to it. Photos that can't be read any more become empty frames.
+ * Resolves true once the copy is saved.
  */
-export async function saveCopy() {
-  if (copying) return;
+export async function saveCopy(): Promise<boolean> {
+  if (copying) return false;
   copying = true;
   toast('Saving a copy…');
   let skipped = 0;
@@ -668,8 +669,10 @@ export async function saveCopy() {
     const id = await copyDesign(S().doc, useCloudStore.getState().name, (n) => (skipped = n));
     toast(skipped ? skippedPhotosNote(skipped) : 'Saved a copy to My designs.');
     navigate(`/d/${id}`);
+    return true;
   } catch (e) {
     toast(importMessage(e));
+    return false;
   } finally {
     copying = false;
   }
