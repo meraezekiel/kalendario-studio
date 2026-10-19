@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { cloudEnabled } from '@/lib/cloud/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export function useAccountMenuHandler() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const ready = useAuthStore((s) => s.ready);
   const [open, setOpen] = useState(false);
@@ -34,6 +36,8 @@ export function useAccountMenuHandler() {
     } catch {
       // Already signed out on the server (or offline); the local session is cleared either way.
     }
+    // My designs and cloud designs need an account; signed out, the local editor is the place to be.
+    if (location.pathname !== '/') router.push('/');
   };
 
   return {

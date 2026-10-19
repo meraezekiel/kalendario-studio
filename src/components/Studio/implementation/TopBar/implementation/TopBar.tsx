@@ -2,13 +2,14 @@
 
 import ConfirmButton from '@/components/ConfirmButton/implementation/ConfirmButton';
 import AccountMenu from '../../AccountMenu/implementation/AccountMenu';
+import CloudBar from './CloudBar/implementation/CloudBar';
 import { useTopBarHandler } from './useTopBarHandler';
 
 export default function TopBar() {
   const h = useTopBarHandler();
   return (
     <header className="top">
-      <div className="brand">Kalendaryo Studio</div>
+      {h.cloud ? <CloudBar /> : <div className="brand">Kalendaryo Studio</div>}
       <button className="btn icon" onClick={h.undo} disabled={!h.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
       <button className="btn icon" onClick={h.redo} disabled={!h.canRedo} title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
       {!h.framed && (

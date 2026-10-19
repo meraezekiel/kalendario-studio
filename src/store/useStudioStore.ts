@@ -6,6 +6,7 @@ import { STORAGE_KEY } from '@/lib/calendar/constants';
 import { makeYear } from '@/lib/calendar/document';
 import { TEMPLATES } from '@/lib/calendar/templates';
 import type { CalendarDoc, El, Page } from '@/lib/calendar/types';
+import type { SharedDoc } from '@/lib/cloud/ydoc';
 
 export type DrawerTab = 'templates' | 'add' | 'graphics' | 'photos' | 'page' | 'support';
 export interface Guide { v?: number; h?: number }
@@ -15,6 +16,12 @@ export type PickTarget = { cal: string; day: number } | { img: string } | { bg: 
 
 const HISTORY_LIMIT = 80;
 const MERGE_MS = 1200;
+/** A view-only design says so at most this often. */
+const READ_ONLY_TOAST_MS = 3000;
+let readOnlyToastAt = -Infinity;
+
+/** Undo/redo kept outside the store (shared designs: per-person undo over the Y.Doc). */
+export interface HistoryDriver { undo(): void; redo(): void; stop(): void }
 
 export function freshDoc(template = 'pastel'): CalendarDoc {
   const doc: CalendarDoc = { v: 3, year: new Date().getFullYear() + 1, holidays: true, cur: 0, assets: {}, tray: [], pages: TEMPLATES[template].make() };
@@ -48,6 +55,12 @@ interface StudioState {
   future: CalendarDoc[];
   lastKey: string | null;
   lastAt: number;
+  /** View-only design: `mutate` refuses changes. */
+  readOnly: boolean;
+  /** When set, history is kept elsewhere: `mutate`/`checkpoint` skip past/future and undo/redo delegate. */
+  historyDriver: HistoryDriver | null;
+  /** Called after every change the user makes (mutate, local undo/redo); `tracked` is false for history:false changes. */
+  onLocalChange: ((prev: CalendarDoc, next: CalendarDoc, tracked: boolean) => void) | null;
 
   /** Changes the document. Records an undo step unless `key` matches the previous change (typing, sliders). */
   mutate: (recipe: (doc: CalendarDoc) => void, opts?: { key?: string; history?: boolean }) => void;
@@ -60,7 +73,10 @@ interface StudioState {
   selectMany: (ids: string[]) => void;
   set: (patch: Partial<Pick<StudioState, 'cropId' | 'armed' | 'editing' | 'tab' | 'clip' | 'guides' | 'marquee' | 'sel' | 'selDay' | 'printing' | 'exporting' | 'thanks'>>) => void;
   showToast: (msg: string) => void;
+  /** Starts editing a document: replaces it (when given), clears history and selection, and marks the store ready. */
   hydrate: (doc: CalendarDoc | null) => void;
+  /** Takes a collaborator's version of the shared document; keeps this person's page and drops vanished selections. */
+  applyRemote: (doc: SharedDoc) => void;
 }
 
 export const useStudioStore = create<StudioState>()(
@@ -85,16 +101,26 @@ export const useStudioStore = create<StudioState>()(
     future: [],
     lastKey: null,
     lastAt: 0,
+    readOnly: false,
+    historyDriver: null,
+    onLocalChange: null,
 
     mutate: (recipe, opts = {}) => {
       const { key, history = true } = opts;
       const now = Date.now();
       const s = get();
+      if (s.readOnly) {
+        if (now - readOnlyToastAt >= READ_ONLY_TOAST_MS) {
+          readOnlyToastAt = now;
+          s.showToast('This design is view only.');
+        }
+        return;
+      }
       const merge = !!key && key === s.lastKey && now - s.lastAt < MERGE_MS;
       const before = s.doc;
       set((st) => {
         recipe(st.doc);
-        if (history && !merge) {
+        if (history && !merge && !s.historyDriver) {
           st.past.push(before);
           if (st.past.length > HISTORY_LIMIT) st.past.shift();
           st.future = [];
@@ -102,18 +128,23 @@ export const useStudioStore = create<StudioState>()(
         st.lastKey = key ?? null;
         st.lastAt = now;
       });
+      const after = get().doc;
+      if (after !== before) get().onLocalChange?.(before, after, history !== false);
     },
 
     checkpoint: () =>
       set((st) => {
-        st.past.push(get().doc);
-        if (st.past.length > HISTORY_LIMIT) st.past.shift();
-        st.future = [];
+        if (!get().historyDriver) {
+          st.past.push(get().doc);
+          if (st.past.length > HISTORY_LIMIT) st.past.shift();
+          st.future = [];
+        }
         st.lastKey = null;
       }),
 
     undo: () => {
       const s = get();
+      if (s.historyDriver) return s.historyDriver.undo();
       if (!s.past.length) return s.showToast('Nothing to undo.');
       const prev = s.past[s.past.length - 1];
       set((st) => {
@@ -123,10 +154,12 @@ export const useStudioStore = create<StudioState>()(
         st.doc = { ...prev, assets: s.doc.assets, tray: s.doc.tray };
         st.sel = null; st.multi = []; st.selDay = null; st.cropId = null; st.editing = null; st.lastKey = null;
       });
+      get().onLocalChange?.(s.doc, get().doc, true);
     },
 
     redo: () => {
       const s = get();
+      if (s.historyDriver) return s.historyDriver.redo();
       if (!s.future.length) return;
       const next = s.future[s.future.length - 1];
       set((st) => {
@@ -135,6 +168,7 @@ export const useStudioStore = create<StudioState>()(
         st.doc = { ...next, assets: s.doc.assets, tray: s.doc.tray };
         st.sel = null; st.multi = []; st.selDay = null; st.cropId = null; st.editing = null; st.lastKey = null;
       });
+      get().onLocalChange?.(s.doc, get().doc, true);
     },
 
     select: (id, day = null) =>
@@ -164,7 +198,27 @@ export const useStudioStore = create<StudioState>()(
     hydrate: (doc) =>
       set((st) => {
         if (doc) st.doc = doc;
+        st.past = []; st.future = []; st.lastKey = null;
+        st.sel = null; st.multi = []; st.selDay = null; st.cropId = null; st.editing = null; st.armed = null;
         st.ready = true;
+      }),
+
+    applyRemote: (shared) =>
+      set((st) => {
+        const cur = Math.max(0, Math.min(st.doc.cur, shared.pages.length - 1));
+        const doc = { ...shared, cur } as CalendarDoc;
+        st.doc = doc;
+        const ids = new Set(curPage(doc).els.map((e) => e.id));
+        if (st.multi.length) {
+          const multi = st.multi.filter((id) => ids.has(id));
+          st.multi = multi.length > 1 ? multi : [];
+          st.sel = multi.length === 1 ? multi[0] : null;
+        } else if (st.sel && !ids.has(st.sel)) {
+          st.sel = null;
+        }
+        if (!st.sel) st.selDay = null;
+        if (st.cropId && !ids.has(st.cropId)) st.cropId = null;
+        if (st.editing && !ids.has(st.editing.id)) st.editing = null;
       }),
   })),
 );

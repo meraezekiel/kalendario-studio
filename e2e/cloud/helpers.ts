@@ -58,3 +58,12 @@ export async function signIn(page: Page, user: { email: string; password: string
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
 }
+
+/** Creates a design from My designs (the page must be signed in), waits for the editor and returns its id. */
+export async function newDesign(page: Page): Promise<string> {
+  await page.goto('/designs');
+  await page.getByRole('button', { name: 'New design' }).click();
+  await page.waitForURL(/\/d\/[0-9a-f-]{36}$/);
+  await expect(page.locator('.ph .page')).toBeVisible();
+  return page.url().split('/d/')[1];
+}

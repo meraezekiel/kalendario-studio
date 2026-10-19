@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { cloudEnabled } from '@/lib/cloud/supabase';
-import { AFTER_SIGN_IN, useAuthStore } from '@/store/useAuthStore';
+import { nextPath, useAuthStore } from '@/store/useAuthStore';
 
 export type AuthTab = 'signin' | 'signup' | 'forgot';
 
@@ -26,7 +26,7 @@ export function useAuthHandler() {
   useEffect(() => useAuthStore.getState().init(), []);
   // Signed in (just now, or already): go on to the app.
   useEffect(() => {
-    if (user) router.replace(AFTER_SIGN_IN);
+    if (user) router.replace(nextPath(location.search));
   }, [user, router]);
 
   const choose = (t: AuthTab) => {

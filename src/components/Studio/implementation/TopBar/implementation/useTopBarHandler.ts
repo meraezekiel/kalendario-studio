@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { MONTHS } from '@/lib/calendar/constants';
 import { monthOf } from '@/lib/calendar/document';
 import { applyDesignToAll, exportPNG, goToPage, openDesignFile, printPages, saveDesignFile } from '@/store/actions';
+import { useCloudStore } from '@/store/useCloudStore';
 import { curPage, useStudioStore } from '@/store/useStudioStore';
 
 /** Inside a frame (e.g. an embedded preview) printing and downloads are usually blocked. */
@@ -24,9 +25,11 @@ export function useTopBarHandler() {
   });
   const canUndo = useStudioStore((s) => s.past.length > 0);
   const canRedo = useStudioStore((s) => s.future.length > 0);
+  const cloud = useCloudStore((s) => s.designId !== null);
   const st = useStudioStore.getState;
   return {
     framed,
+    cloud,
     saveFile: saveDesignFile,
     openFile: openDesignFile,
     label,

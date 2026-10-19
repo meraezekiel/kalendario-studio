@@ -4,8 +4,14 @@ import { cloudEnabled, supabase } from '@/lib/cloud/supabase';
 
 export type AuthUser = { id: string; email: string; name: string };
 
-/** Where a fresh sign-in lands. Task 6 points this at /designs once My designs exists. */
-export const AFTER_SIGN_IN = '/';
+/** Where a fresh sign-in lands. */
+export const AFTER_SIGN_IN = '/designs';
+
+/** A same-site path from `?next=` (e.g. /d/<id> after a signed-out visit), or AFTER_SIGN_IN. */
+export function nextPath(search: string): string {
+  const next = new URLSearchParams(search).get('next');
+  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : AFTER_SIGN_IN;
+}
 
 interface AuthState {
   user: AuthUser | null;

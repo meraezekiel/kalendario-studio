@@ -10,6 +10,12 @@ export function usePersistenceHandler() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let unsub: (() => void) | undefined;
+    const save = () => {
+      timer = undefined;
+      set(STORAGE_KEY, useStudioStore.getState().doc).catch(() =>
+        toast('Could not save to this browser. Your work stays while this tab is open.'),
+      );
+    };
 
     get(STORAGE_KEY)
       .catch(() => null)
@@ -20,18 +26,18 @@ export function usePersistenceHandler() {
         unsub = useStudioStore.subscribe((s, prev) => {
           if (s.doc === prev.doc) return;
           clearTimeout(timer);
-          timer = setTimeout(() => {
-            set(STORAGE_KEY, useStudioStore.getState().doc).catch(() =>
-              toast('Could not save to this browser. Your work stays while this tab is open.'),
-            );
-          }, 400);
+          timer = setTimeout(save, 400);
         });
       });
 
     return () => {
       cancelled = true;
-      clearTimeout(timer);
       unsub?.();
+      // Leaving the editor (e.g. for My designs): save what's still waiting.
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        save();
+      }
     };
   }, []);
 }

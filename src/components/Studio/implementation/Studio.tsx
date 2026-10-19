@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import Drawer from './Drawer/implementation/Drawer';
 import ExportBox from './ExportBox/implementation/ExportBox';
 import Inspector from './Inspector/implementation/Inspector';
@@ -11,9 +12,21 @@ import ToolRail from './ToolRail/implementation/ToolRail';
 import TopBar from './TopBar/implementation/TopBar';
 import { useStudioHandler } from './useStudioHandler';
 
-/** The calendar editor: top bar, tool rail + drawer, canvas, inspector. */
-export default function Studio() {
-  const { ready } = useStudioHandler();
+/** The calendar editor: top bar, tool rail + drawer, canvas, inspector. With `designId`, edits a cloud design. */
+export default function Studio({ designId }: { designId?: string }) {
+  const { ready, denied } = useStudioHandler(designId);
+  if (denied) {
+    return (
+      <main className="auth-page">
+        <div className="auth-card">
+          <div className="auth-brand">Kalendaryo Studio</div>
+          <p className="auth-title" role="alert">You don&apos;t have access to this design.</p>
+          <p className="hint">Ask its owner to share it with you, or open one of your own.</p>
+          <Link className="btn primary auth-wide" href="/designs">My designs</Link>
+        </div>
+      </main>
+    );
+  }
   if (!ready) return <div className="boot">Loading Kalendaryo Studio…</div>;
   return (
     <>
