@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { megabytes, PHOTO_SPACE_BYTES } from '@/lib/cloud/limits';
 import { photoUsage } from '@/lib/cloud/photos';
 import { cloudEnabled } from '@/lib/cloud/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -59,7 +60,7 @@ export function useAccountMenuHandler() {
     user,
     initial: (user?.name || user?.email || '?').charAt(0).toUpperCase(),
     open,
-    usage: used == null ? null : `${mb(used)} MB of 50 MB used`,
+    usage: used == null ? null : `${mb(used)} MB of ${megabytes(PHOTO_SPACE_BYTES)} used`,
     toggle: () => {
       setUsed(null); // no stale figure while the fresh one loads
       setOpen((o) => !o);

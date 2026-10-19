@@ -1,15 +1,14 @@
 import { readImage } from '../calendar/samplePhoto';
 import type { Asset, CalendarDoc } from '../calendar/types';
+import { MAX_PHOTO_BYTES } from './limits';
 import { supabase } from './supabase';
 import { CloudError, toCloudError } from './transport';
 
 const BUCKET = 'photos';
 const PREFIX = 'sb:';
-/** Cloud photos are stored smaller than local ones: they count against the account's 50 MB. */
+/** Cloud photos are stored smaller than local ones: they count against the account's photo space. */
 const CLOUD_MAX_PX = 1600;
 const CLOUD_QUALITY = 0.82;
-/** Per-photo limit (the bucket's and the photos table's). */
-const MAX_PHOTO_BYTES = 5242880;
 
 /** True for a photo kept in cloud storage (`sb:<path>`), as opposed to a data, blob or sample source. */
 export const isCloudSrc = (src: string | null | undefined): src is string => !!src && src.startsWith(PREFIX);
@@ -38,7 +37,7 @@ export function canDeleteCloudPhoto(doc: CalendarDoc, assetId: string, designId:
   return !Object.entries(doc.assets).some(([id, a]) => id !== assetId && a.src === src);
 }
 
-/** One photo is over the 5 MB per-photo limit (even after downscaling). */
+/** One photo is over the per-photo limit, MAX_PHOTO_BYTES (even after downscaling). */
 export class PhotoTooLarge extends Error {
   constructor(message = 'photo too large') {
     super(message);
@@ -109,8 +108,8 @@ const downloading = new Map<string, Promise<Blob>>();
 /**
  * Stores a picked photo for design `designId` and returns its asset (`sb:<path>`). The photos row goes
  * first (storage only takes files that have one), then the file; a failed upload takes its row back.
- * Throws UnreadableImage, PhotoTooLarge (over 5 MB, checked before anything is sent), or CloudError
- * 'limit' (50 MB per account) / 'offline' / 'denied'.
+ * Throws UnreadableImage, PhotoTooLarge (over MAX_PHOTO_BYTES, checked before anything is sent), or CloudError
+ * 'limit' (PHOTO_SPACE_BYTES per account) / 'offline' / 'denied'.
  */
 export function uploadPhoto(designId: string, file: File): Promise<Asset> {
   return uploadPhotoTo({ designId }, file);

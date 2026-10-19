@@ -15,6 +15,7 @@ import type { CalEl, El, Page, ShapeEl, ShapeKind, SheetSettings } from '@/lib/c
 import { clamp, clone, uid } from '@/lib/calendar/utils';
 import { canDeleteCloudPhoto, cloudPath, deletePhoto, embedPhotos, photosOf, PhotoTooLarge, UnreadableImage, uploadPhoto } from '@/lib/cloud/photos';
 import { importDoc } from '@/lib/cloud/importDoc';
+import { DESIGNS_FULL, MAX_PHOTO_BYTES, megabytes, PHOTO_SPACE_BYTES } from '@/lib/cloud/limits';
 import { copyDesign } from '@/lib/cloud/members';
 import { CloudError } from '@/lib/cloud/transport';
 import { useAuthStore } from './useAuthStore';
@@ -126,8 +127,8 @@ export function addGraphic(key: string, pt?: { x: number; y: number }) {
 
 /* ---------- photos ---------- */
 
-export const PHOTO_SPACE_FULL = 'Your 50 MB photo space is full. Remove photos from your designs to add more.';
-const PHOTO_TOO_BIG = 'That photo is too big to add (over 5 MB). Try a smaller one.';
+export const PHOTO_SPACE_FULL = `Your ${megabytes(PHOTO_SPACE_BYTES)} photo space is full. Remove photos from your designs to add more.`;
+const PHOTO_TOO_BIG = `That photo is too big to add (over ${megabytes(MAX_PHOTO_BYTES)}). Try a smaller one.`;
 const PHOTO_OFFLINE = "You're offline. Photos can be added once you're back online.";
 
 /**
@@ -630,7 +631,7 @@ export function setNavigate(fn: (path: string) => void) {
 
 /** A sentence for a failed import into the account. */
 export function importMessage(e: unknown): string {
-  if (e instanceof CloudError && e.code === 'limit') return /design limit/.test(e.message) ? "You've reached 50 designs. Delete one to make room." : PHOTO_SPACE_FULL;
+  if (e instanceof CloudError && e.code === 'limit') return /design limit/.test(e.message) ? DESIGNS_FULL : PHOTO_SPACE_FULL;
   if (e instanceof CloudError && e.code === 'offline') return "You're offline. Try again once you're back online.";
   return 'Could not save it to My designs. Please try again.';
 }

@@ -1,10 +1,8 @@
 import type { Asset, CalendarDoc } from '../calendar/types';
 import { createDesign, removeDesign, writeNewDesign } from './designs';
 import { cloudPath, copyPhoto, dataUrlFile, isCloudSrc, photoUsage, PhotoTooLarge, UnreadableImage, uploadPhoto, uploadPhotoTo, type PhotoOwner } from './photos';
+import { PHOTO_SPACE_BYTES } from './limits';
 import { CloudError } from './transport';
-
-/** Photo space per account (the server's limit). */
-export const PHOTO_SPACE_BYTES = 52428800;
 
 const isDataSrc = (src: string | null | undefined): src is string => !!src && src.startsWith('data:');
 

@@ -29,6 +29,8 @@ Never commit `.env.local` or `.env.test.local`; both are git-ignored. `.env.exam
    ```
    Run this again whenever a new migration file is added.
 
+The account limits (50 MB of photos, 50 designs, 5 MB per photo) live in two places: the SQL function `app_limits()` (plus the photos bucket's file size limit) and `src/lib/cloud/limits.ts`, which the app's messages are built from. Change both together, in a new migration.
+
 ## 3. Test project (`.env.test.local`)
 
 The integration tests create and delete throwaway users, so they run against a separate, disposable project, never the real one.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createDesign, type DesignRow, listMine, listShared, removeDesign, renameDesign } from '@/lib/cloud/designs';
+import { DESIGNS_FULL, MAX_DESIGNS } from '@/lib/cloud/limits';
 import { cloudEnabled } from '@/lib/cloud/supabase';
 import { CloudError } from '@/lib/cloud/transport';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -12,9 +13,6 @@ export const TABS: { id: DesignsTab; label: string }[] = [
   { id: 'mine', label: 'My designs' },
   { id: 'shared', label: 'Shared with me' },
 ];
-
-const MAX_DESIGNS = 50;
-const LIMIT_MSG = "You've reached 50 designs. Delete one to make room.";
 
 /** My designs: lists the account's own and shared designs; creates, renames and deletes. */
 export function useDesignsHandler() {
@@ -54,13 +52,13 @@ export function useDesignsHandler() {
   const create = async () => {
     if (creating) return;
     setError('');
-    if ((mine?.length ?? 0) >= MAX_DESIGNS) return setError(LIMIT_MSG);
+    if ((mine?.length ?? 0) >= MAX_DESIGNS) return setError(DESIGNS_FULL);
     setCreating(true);
     try {
       const id = await createDesign(freshDoc());
       router.push(`/d/${id}`);
     } catch (e) {
-      setError(e instanceof CloudError && e.code === 'limit' ? LIMIT_MSG : 'Could not create a design. Please try again.');
+      setError(e instanceof CloudError && e.code === 'limit' ? DESIGNS_FULL : 'Could not create a design. Please try again.');
       setCreating(false);
     }
   };
