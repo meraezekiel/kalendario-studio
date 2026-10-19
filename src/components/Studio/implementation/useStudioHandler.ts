@@ -1,3 +1,6 @@
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { setNavigate } from '@/store/actions';
 import { useCloudStore } from '@/store/useCloudStore';
 import { useStudioStore } from '@/store/useStudioStore';
 import { useCloudSessionHandler } from './handler/useCloudSessionHandler';
@@ -11,6 +14,8 @@ export function useStudioHandler(designId?: string) {
   designId ? useCloudSessionHandler(designId) : usePersistenceHandler();
   useKeyboardHandler();
   usePasteHandler();
+  const router = useRouter();
+  useEffect(() => setNavigate((path) => router.push(path)), [router]);
   const storeReady = useStudioStore((s) => s.ready);
   const session = useCloudStore((s) => s.designId);
   const denied = useCloudStore((s) => !!designId && s.designId === designId && s.status.state === 'denied');

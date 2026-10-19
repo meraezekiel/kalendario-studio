@@ -112,7 +112,18 @@ const downloading = new Map<string, Promise<Blob>>();
  * Throws UnreadableImage, PhotoTooLarge (over 5 MB, checked before anything is sent), or CloudError
  * 'limit' (50 MB per account) / 'offline' / 'denied'.
  */
-export async function uploadPhoto(designId: string, file: File): Promise<Asset> {
+export function uploadPhoto(designId: string, file: File): Promise<Asset> {
+  return uploadPhotoTo({ designId }, file);
+}
+
+/** Where a stored photo belongs: a design, or a saved template. Its file goes in that one's folder. */
+export type PhotoOwner = { designId: string } | { templateId: string };
+
+const folderOf = (o: PhotoOwner) => ('designId' in o ? o.designId : o.templateId);
+const rowOf = (o: PhotoOwner) => ('designId' in o ? { design_id: o.designId } : { template_id: o.templateId });
+
+/** `uploadPhoto` for a design or a template. */
+export async function uploadPhotoTo(owner: PhotoOwner, file: File): Promise<Asset> {
   let a: Asset;
   try {
     // Only images with real transparency stay PNG; opaque ones become JPEG.
@@ -123,9 +134,9 @@ export async function uploadPhoto(designId: string, file: File): Promise<Asset> 
   const blob = toBlob(a.src);
   if (blob.size > MAX_PHOTO_BYTES) throw new PhotoTooLarge();
   if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new CloudError('offline', 'offline');
-  const path = `${designId}/${crypto.randomUUID()}.${blob.type === 'image/png' ? 'png' : 'jpg'}`;
+  const path = `${folderOf(owner)}/${crypto.randomUUID()}.${blob.type === 'image/png' ? 'png' : 'jpg'}`;
   const sb = supabase();
-  await run(sb.from('photos').insert({ path, design_id: designId, bytes: blob.size }));
+  await run(sb.from('photos').insert({ path, ...rowOf(owner), bytes: blob.size }));
   try {
     await run(sb.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, upsert: false }));
   } catch (e) {
@@ -139,6 +150,40 @@ export async function uploadPhoto(designId: string, file: File): Promise<Asset> 
   }
   blobs.set(path, blob);
   return { src: PREFIX + path, w: a.w, h: a.h };
+}
+
+/**
+ * Copies stored photo `from` into `owner`'s folder (so no design or template points into another's)
+ * and returns the copy's source. The new row goes first, then the file is copied; a failed copy takes
+ * its row back. Throws CloudError 'limit' / 'offline' / 'denied' (e.g. the original is gone).
+ */
+export async function copyPhoto(from: string, owner: PhotoOwner): Promise<string> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new CloudError('offline', 'offline');
+  const sb = supabase();
+  const rows = (await run(sb.from('photos').select('bytes').eq('path', from))) as { bytes: number }[] | null;
+  const bytes = rows?.[0]?.bytes;
+  if (!bytes) throw new CloudError('denied', 'photo not found');
+  const path = `${folderOf(owner)}/${crypto.randomUUID()}.${from.endsWith('.png') ? 'png' : 'jpg'}`;
+  await run(sb.from('photos').insert({ path, ...rowOf(owner), bytes }));
+  try {
+    await run(sb.storage.from(BUCKET).copy(from, path));
+  } catch (e) {
+    try {
+      await sb.from('photos').delete().eq('path', path);
+    } catch {
+      // offline: keep the original error
+    }
+    throw e;
+  }
+  const had = blobs.get(from);
+  if (had) blobs.set(path, had);
+  return PREFIX + path;
+}
+
+/** A data URL as a file, for `uploadPhoto`. */
+export function dataUrlFile(dataUrl: string, name = 'photo'): File {
+  const blob = toBlob(dataUrl);
+  return new File([blob], name, { type: blob.type });
 }
 
 /** The file of cloud photo `path`, downloaded once per tab. */

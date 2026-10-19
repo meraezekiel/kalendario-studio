@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import Drawer from './Drawer/implementation/Drawer';
+import CloudBanner from './CloudBanner/implementation/CloudBanner';
+import Drawer from'./Drawer/implementation/Drawer';
 import ExportBox from './ExportBox/implementation/ExportBox';
 import Inspector from './Inspector/implementation/Inspector';
 import PrintArea from './PrintArea/implementation/PrintArea';
@@ -41,6 +42,7 @@ export default function Studio({ designId }: { designId?: string }) {
       <ExportBox />
       <Toast />
       <ThanksNote />
+      {!designId && <CloudBanner />}
     </>
   );
 }

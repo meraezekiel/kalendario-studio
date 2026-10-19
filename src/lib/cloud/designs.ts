@@ -68,12 +68,26 @@ export async function getDesign(id: string): Promise<{ name: string; role: Role;
 
 /** Creates a design holding `doc` (as a Yjs state) and returns its id. Throws CloudError 'limit' at the design cap. */
 export async function createDesign(doc: CalendarDoc, name?: string): Promise<string> {
+  const row = await run(supabase().from('designs').insert({ state: encode(doc), ...(name?.trim() ? { name: name.trim() } : {}) }).select('id').single());
+  return (row as { id: string }).id;
+}
+
+/** `doc` as a fresh base64 Yjs state. */
+function encode(doc: CalendarDoc): string {
   const y = new Y.Doc();
   writeDoc(y, doc);
   const state = toB64(Y.encodeStateAsUpdate(y));
   y.destroy();
-  const row = await run(supabase().from('designs').insert({ state, ...(name?.trim() ? { name: name.trim() } : {}) }).select('id').single());
-  return (row as { id: string }).id;
+  return state;
+}
+
+/**
+ * Replaces the stored state of a design nobody has opened yet (e.g. one just made by an import, once
+ * its photos are uploaded). Edits made in the editor since would be lost, so only use it right after createDesign.
+ */
+export async function writeNewDesign(id: string, doc: CalendarDoc): Promise<void> {
+  const rows = await run(supabase().from('designs').update({ state: encode(doc) }).eq('id', id).select('id'));
+  if (!(rows as unknown[] | null)?.length) throw new CloudError('denied', 'design not found');
 }
 
 /** Renames a design (owner only). */

@@ -37,6 +37,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .thanks-acts{display:flex;gap:8px;flex-wrap:wrap}
 .thanks-acts .btn{margin:0}
 .thanks-acts+p{margin-top:12px}
+.cloud-banner{position:fixed;left:84px;bottom:20px;z-index:91;width:300px;max-width:calc(100vw - 32px);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.15);font-size:13px}
+.cloud-banner p{margin:6px 0 10px;color:var(--muted);line-height:1.45}
 .thanks-x{position:absolute;top:6px;right:6px;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;padding:6px;border-radius:8px}
 .drawer,.insp{background:var(--panel);overflow:auto;padding:16px 14px 40px;display:flex;flex-direction:column;gap:18px;min-height:0}
 .drawer{grid-area:drawer;border-right:1px solid var(--line)}
@@ -122,7 +124,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .rail{flex-direction:row;border:0;border-top:1px solid var(--line);overflow-x:auto}
   .rail button{flex:1}
   .rail button.rail-end{margin-top:0}
-  .thanks{left:16px;right:16px;bottom:16px;width:auto}
+  .thanks,.cloud-banner{left:16px;right:16px;bottom:16px;width:auto}
   .drawer,.insp{border:0;border-top:1px solid var(--line);overflow:visible}
 }
 
@@ -181,7 +183,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 #printArea{display:none}
 @media print{
   html,body{background:#fff!important;height:auto}
-  .app,.toast,.thanks{display:none!important}
+  .app,.toast,.thanks,.cloud-banner{display:none!important}
   #printArea{display:block}
   .sheetp{overflow:hidden;break-after:page;page-break-after:always}
   .sheetp:last-child{break-after:auto;page-break-after:auto}

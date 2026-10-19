@@ -14,7 +14,7 @@ export default function MyTemplates() {
       <h3>My templates</h3>
       <button className="btn primary" style={{ width: '100%', marginBottom: 10 }} onClick={h.openSave}>Save this design as a template</button>
       {h.loaded && !h.items.length && (
-        <p className="hint">Save a design you like to reuse it next time. Your templates stay in this browser, and only templates you saved can be deleted.</p>
+        <p className="hint">Save a design you like to reuse it next time. Your templates {h.inAccount ? 'are kept in your account' : 'stay in this browser'}, and only templates you saved can be deleted.</p>
       )}
       {h.items.length > 0 && (
         <div className="tplgrid">

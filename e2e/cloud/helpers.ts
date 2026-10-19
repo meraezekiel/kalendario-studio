@@ -50,6 +50,28 @@ export async function cleanupUsers() {
   if (failed.length) throw new Error(`Could not delete test users:\n${failed.join('\n')}`);
 }
 
+/**
+ * Makes `userId` use `bytes` of photo space without storing anything: a design they own plus photos
+ * rows (at most 5 MB each) with no files. Their rows go when the user is deleted.
+ */
+export async function seedPhotoUsage(userId: string, bytes: number) {
+  const { data, error } = await admin().from('designs').insert({ owner: userId, name: 'Seeded photos' }).select('id').single();
+  if (error) throw error;
+  const rows: { path: string; design_id: string; bytes: number }[] = [];
+  for (let left = bytes; left > 0; left -= 5242880) {
+    rows.push({ path: `${data.id}/seed-${randomUUID()}.jpg`, design_id: data.id, bytes: Math.min(left, 5242880) });
+  }
+  const res = await admin().from('photos').insert(rows);
+  if (res.error) throw res.error;
+}
+
+/** Names of the designs `userId` owns. */
+export async function designNames(userId: string): Promise<string[]> {
+  const { data, error } = await admin().from('designs').select('name').eq('owner', userId);
+  if (error) throw error;
+  return (data ?? []).map((d) => d.name as string);
+}
+
 /** Signs in through the /login page and waits for the account avatar. Sign-ins are rate-limited: use sparingly. */
 export async function signIn(page: Page, user: { email: string; password: string }) {
   await page.goto('/login');

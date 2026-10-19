@@ -14,7 +14,9 @@ import { markThanksSeen, thanksSeen } from '@/lib/support/support';
 import type { CalEl, El, Page, ShapeEl, ShapeKind, SheetSettings } from '@/lib/calendar/types';
 import { clamp, clone, uid } from '@/lib/calendar/utils';
 import { canDeleteCloudPhoto, cloudPath, deletePhoto, embedPhotos, photosOf, PhotoTooLarge, UnreadableImage, uploadPhoto } from '@/lib/cloud/photos';
+import { importDoc } from '@/lib/cloud/importDoc';
 import { CloudError } from '@/lib/cloud/transport';
+import { useAuthStore } from './useAuthStore';
 import { useCloudStore } from './useCloudStore';
 import { curPage, findEl, type PickTarget, selIds, toast, useStudioStore } from './useStudioStore';
 
@@ -123,9 +125,9 @@ export function addGraphic(key: string, pt?: { x: number; y: number }) {
 
 /* ---------- photos ---------- */
 
-const PHOTO_SPACE_FULL = 'Your 50 MB photo space is full. Remove photos from your designs to add more.';
+export const PHOTO_SPACE_FULL = 'Your 50 MB photo space is full. Remove photos from your designs to add more.';
 const PHOTO_TOO_BIG = 'That photo is too big to add (over 5 MB). Try a smaller one.';
-const PHOTO_OFFLINE ="You're offline. Photos can be added once you're back online.";
+const PHOTO_OFFLINE = "You're offline. Photos can be added once you're back online.";
 
 /**
  * Reads picked images into the doc's assets and tray, returning their ids. In a cloud design each is
@@ -571,8 +573,15 @@ export function openDesignFile() {
     const file = inp.files?.[0];
     inp.remove();
     if (!file) return;
+    let next: ReturnType<typeof parseDesign>;
     try {
-      const next = parseDesign(await file.text());
+      next = parseDesign(await file.text());
+    } catch (e) {
+      return toast(e instanceof Error ? e.message : 'Could not open that file.');
+    }
+    // Signed in, a file becomes a new design in My designs (on the local editor and in a cloud design alike).
+    if (useAuthStore.getState().user) return importFile(next, file.name);
+    try {
       S().select(null);
       S().mutate((d) => void Object.assign(d, next));
       toast(`Opened ${file.name} (${next.pages.length} page${next.pages.length > 1 ? 's' : ''}). Press Undo to go back to your previous design.`);
@@ -582,6 +591,37 @@ export function openDesignFile() {
   });
   document.body.appendChild(inp);
   inp.click();
+}
+
+let navigate = (path: string) => location.assign(path);
+/** Lets actions move to another screen through the app's router (set by the editor). */
+export function setNavigate(fn: (path: string) => void) {
+  navigate = fn;
+}
+
+/** A sentence for a failed import into the account. */
+export function importMessage(e: unknown): string {
+  if (e instanceof CloudError && e.code === 'limit') return /design limit/.test(e.message) ? "You've reached 50 designs. Delete one to make room." : PHOTO_SPACE_FULL;
+  if (e instanceof CloudError && e.code === 'offline') return "You're offline. Try again once you're back online.";
+  return 'Could not save it to My designs. Please try again.';
+}
+
+/** Progress while photos go up, naming the one on its way: `Uploading photos 3 of 12…`. */
+export const uploadingNote = (done: number, total: number) => `Uploading photos ${Math.min(done + 1, total)} of ${total}…`;
+export const skippedPhotosNote = (n: number) => `${n} photo${n > 1 ? 's' : ''} couldn't be copied and show${n > 1 ? '' : 's'} as an empty frame.`;
+
+/** Makes an opened design file a new cloud design and goes to it. */
+async function importFile(doc: ReturnType<typeof parseDesign>, fileName: string) {
+  const name = fileName.replace(/\.(kalendaryo|json)$/i, '').trim() || 'Untitled calendar';
+  toast(`Opening ${fileName}…`);
+  let skipped = 0;
+  try {
+    const id = await importDoc(doc, name, (d, t) => t && toast(uploadingNote(d, t)), (n) => (skipped = n));
+    toast(skipped ? skippedPhotosNote(skipped) : `Saved ${fileName} to My designs.`);
+    navigate(`/d/${id}`);
+  } catch (e) {
+    toast(importMessage(e));
+  }
 }
 
 let storageAsked = false;
