@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { SupabaseTransport } from '../../src/lib/cloud/transport';
 import { admin, as, cleanup, email, makeUser, type TestUser } from './helpers';
 
 // One pool of throwaway users per run (signed in once each: auth rate-limits sign-ins);
@@ -416,6 +417,50 @@ describe('realtime', () => {
       });
     });
   }
+
+  it('transport maps RLS error to denied', async () => {
+    const { owner, viewer, stranger, design, users } = await cast();
+    await expect(new SupabaseTransport(design.id, users.v.id, viewer).push('u1')).rejects.toMatchObject({ code: 'denied' });
+    await expect(new SupabaseTransport(design.id, users.s.id, stranger).push('u1')).rejects.toMatchObject({ code: 'denied' });
+    await expect(new SupabaseTransport(design.id, users.s.id, stranger).load()).rejects.toMatchObject({ code: 'denied' });
+    await expect(new SupabaseTransport(design.id, users.v.id, viewer).compact('x', 0)).rejects.toMatchObject({ code: 'denied' });
+    expect((await new SupabaseTransport(design.id, users.o.id, owner).load()).updates).toEqual([]);
+  });
+
+  it('transport delivers a pushed update to a subscribed member; load returns updates after state', async () => {
+    const { owner, editor, viewer, design, users } = await cast();
+    const ot = new SupabaseTransport(design.id, users.o.id, owner);
+    const first = await ot.push('u1');
+    expect(await ot.compact('s1', first.id)).toBe(true);
+
+    const vt = new SupabaseTransport(design.id, users.v.id, viewer);
+    const got: { id: number; data: string; author: string }[] = [];
+    let unsub = () => {};
+    const received = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no realtime update within 20s')), 20_000);
+      let pushed = false;
+      unsub = vt.subscribe(
+        (u) => { got.push(u); clearTimeout(timer); resolve(); },
+        (s) => {
+          if (s !== 'live' || pushed) return;
+          pushed = true;
+          new SupabaseTransport(design.id, users.e.id, editor).push('u2').catch(reject);
+        },
+      );
+    });
+    try {
+      expect(vt.channel()).not.toBeNull();
+      await received;
+    } finally {
+      unsub();
+    }
+    expect(vt.channel()).toBeNull();
+    expect(got).toHaveLength(1);
+    expect(got[0]).toMatchObject({ data: 'u2', author: users.e.id });
+
+    const load = await vt.load();
+    expect(load).toEqual({ state: 's1', through: first.id, updates: [{ id: got[0].id, data: 'u2' }] });
+  }, 40_000);
 
   it('private design channel admits members and refuses strangers', async () => {
     const { viewer, stranger, design } = await cast();
