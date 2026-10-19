@@ -98,6 +98,28 @@ describe('ydoc', () => {
     expect(readDoc(a)!.pages[0].els.some((e) => e.id === id)).toBe(false);
   });
 
+  it('applyDiff keeps a collaborator element that local prev/next do not know', () => {
+    const doc = mkDoc();
+    const [a, b] = pair(doc);
+    const theirs = { ...clone(doc.pages[0].els[0]), id: 'theirs' };
+    applyDiff(b, doc, edit(doc, (d) => { d.pages[0].els.push(theirs); }));
+    Y.applyUpdate(a, Y.encodeStateAsUpdate(b, Y.encodeStateVector(a)));
+    applyDiff(a, doc, edit(doc, (d) => { d.pages[0].els.push(d.pages[0].els.shift()!); d.pages[0].els[0].x = 5; }));
+    sync(a, b);
+    for (const y of [a, b]) expect(readDoc(y)!.pages[0].els.some((e) => e.id === 'theirs')).toBe(true);
+    expect(readDoc(a)).toEqual(readDoc(b));
+  });
+
+  it('applyDiff still deletes an element it knew about', () => {
+    const doc = mkDoc();
+    const id = doc.pages[0].els[0].id;
+    const y = new Y.Doc();
+    writeDoc(y, doc);
+    applyDiff(y, doc, edit(doc, (d) => { d.pages[0].els.shift(); }));
+    expect(readDoc(y)!.pages[0].els.some((e) => e.id === id)).toBe(false);
+    expect(readDoc(y)!.pages[0].els.length).toBe(doc.pages[0].els.length - 1);
+  });
+
   it('reordering els keeps all elements', () => {
     const doc = mkDoc();
     const y = new Y.Doc();

@@ -51,25 +51,35 @@ function diffIdArray(arr: Y.Array<Y.Map<unknown>>, prev: Obj[], next: Obj[]) {
   const prevById = new Map(prev.map((e) => [e.id as string, e]));
   const nextIds = new Set(next.map((e) => e.id as string));
   const idAt = (i: number) => arr.get(i).get('id') as string;
-  for (let i = arr.length - 1; i >= 0; i--) if (!nextIds.has(idAt(i))) arr.delete(i, 1);
-  for (let i = 0; i < next.length; i++) {
-    const n = next[i];
-    if (i < arr.length && idAt(i) === n.id) {
+  // Items neither side knew about (a collaborator's, not yet merged locally) are left alone.
+  const known = (i: number) => prevById.has(idAt(i)) || nextIds.has(idAt(i));
+  for (let i = arr.length - 1; i >= 0; i--) if (prevById.has(idAt(i)) && !nextIds.has(idAt(i))) arr.delete(i, 1);
+  const skip = (from: number) => {
+    while (from < arr.length && !known(from)) from++;
+    return from;
+  };
+  let pos = 0;
+  for (let k = 0; k < next.length; k++) {
+    const n = next[k];
+    pos = skip(pos);
+    if (pos < arr.length && idAt(pos) === n.id) {
       const p = prevById.get(n.id as string);
-      if (p && p !== n) diffMap(arr.get(i), p, n);
+      if (p && p !== n) diffMap(arr.get(pos), p, n);
+      pos++;
       continue;
     }
-    if (i + 1 < arr.length && idAt(i + 1) === n.id) {
-      arr.delete(i, 1); // the item here moved later; it is re-inserted when reached
-      i--;
+    const q = skip(pos + 1);
+    if (pos < arr.length && q < arr.length && idAt(q) === n.id) {
+      arr.delete(pos, 1); // the item here moved later; it is re-inserted when reached
+      k--;
       continue;
     }
-    for (let j = i + 1; j < arr.length; j++) {
+    for (let j = pos; j < arr.length; j++) {
       if (idAt(j) === n.id) { arr.delete(j, 1); break; }
     }
-    arr.insert(i, [toY('', n) as Y.Map<unknown>]);
+    arr.insert(pos, [toY('', n) as Y.Map<unknown>]);
+    pos++;
   }
-  if (arr.length > next.length) arr.delete(next.length, arr.length - next.length);
 }
 
 function diffMap(m: Y.Map<unknown>, prev: Obj, next: Obj) {
