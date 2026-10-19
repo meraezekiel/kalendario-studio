@@ -234,8 +234,10 @@ test('removing access while the invitee has it open shows the access-lost banner
   await expect(p1.getByLabel('Design name')).toHaveValue('Untitled calendar (copy)');
   await expect(syncState(p1)).toHaveText('Saved');
 
-  // Close leaves for My designs.
-  await addHeading(p2, 'Refused too');
+  // Close leaves for My designs. The second tab may already know access went (the live channel can
+  // drop it and the reload is refused); if not, its next edit is refused.
+  await p2.getByRole('button', { name: 'Add', exact: true }).click();
+  await p2.getByRole('button', { name: 'Add a heading' }).click({ timeout: 3000 }).catch(() => {});
   await expect(p2.getByTestId('cloud-banner')).toContainText('You no longer have access to this design.', { timeout: 15_000 });
   await p2.getByTestId('cloud-banner').getByRole('button', { name: 'Close' }).click();
   await expect(p2).toHaveURL(/\/designs$/);

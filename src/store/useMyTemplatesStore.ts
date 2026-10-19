@@ -167,7 +167,10 @@ export const useMyTemplatesStore = create<MyTemplatesState>()((setState, getStat
   },
   apply: async (id) => {
     let t = getState().list.find((x) => x.id === id);
-    if (!t || !(await confirmReplaceAll())) return;
+    if (!t) return;
+    // Only waits when someone else must be asked, so on the local editor nothing here changes timing.
+    const ok = confirmReplaceAll();
+    if (ok !== true && !(await ok)) return;
     const st = useStudioStore.getState();
     const designId = useCloudStore.getState().designId;
     let skipped = 0;

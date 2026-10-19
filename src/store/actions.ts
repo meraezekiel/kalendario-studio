@@ -449,8 +449,18 @@ export function movePage(dir: -1 | 1) {
   });
 }
 
-export async function applyTemplate(key: string) {
-  if (!(await confirmReplaceAll())) return;
+/** Runs a whole-design change once confirmed: synchronously when nobody else needs asking. */
+function confirmed(run: () => void): void | Promise<void> {
+  const ok = confirmReplaceAll();
+  if (ok === true) return run();
+  return ok.then((yes) => { if (yes) run(); });
+}
+
+export function applyTemplate(key: string): void | Promise<void> {
+  return confirmed(() => applyTemplateNow(key));
+}
+
+function applyTemplateNow(key: string) {
   S().mutate((d) => {
     d.pages = TEMPLATES[key].make();
     d.cur = 0;
@@ -460,8 +470,11 @@ export async function applyTemplate(key: string) {
   toast(`${TEMPLATES[key].name}: ${S().doc.pages.length} pages ready. Change anything, then use “Apply design to all months”.`);
 }
 
-export async function fillYear() {
-  if (!(await confirmReplaceAll())) return;
+export function fillYear(): void | Promise<void> {
+  return confirmed(fillYearNow);
+}
+
+function fillYearNow() {
   let n = 0;
   const b = curPage(S().doc).month;
   S().mutate((d) => void (n = makeYear(d)));
@@ -469,8 +482,11 @@ export async function fillYear() {
   toast(`${n} page${n > 1 ? 's' : ''} ready, ${MONTHS[b]} to December.`);
 }
 
-export async function applyDesignToAll() {
-  if (!(await confirmReplaceAll())) return;
+export function applyDesignToAll(): void | Promise<void> {
+  return confirmed(applyDesignToAllNow);
+}
+
+function applyDesignToAllNow() {
   let n = 0;
   S().mutate((d) => void (n = syncDesign(d)));
   S().select(null);
@@ -478,12 +494,12 @@ export async function applyDesignToAll() {
 }
 
 /** Sets the calendar year (every page's dates change). Typing or stepping through years asks only once. */
-export async function setYear(y: number) {
+export function setYear(y: number): void | Promise<void> {
   if (y < 1900 || y > 2200) return;
   const s = S();
+  const set = () => S().mutate((d) => void (d.year = y), { key: 'doc:year' });
   const continuing = s.lastKey === 'doc:year' && Date.now() - s.lastAt < 1200;
-  if (!continuing && !(await confirmReplaceAll())) return;
-  S().mutate((d) => void (d.year = y), { key: 'doc:year' });
+  return continuing ? set() : confirmed(set);
 }
 
 /** Changes the paper and stretches the design vertically to the new height. */

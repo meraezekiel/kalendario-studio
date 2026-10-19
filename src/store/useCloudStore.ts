@@ -72,13 +72,13 @@ export const useCloudStore = create<CloudState>((set, get) => ({
 }));
 
 /**
- * Before a change that replaces every page: when someone else is in the design, asks first. Resolves true
- * at once when nobody else is here (always, on the local editor) or the design is view only (the change
- * itself then says so).
+ * Before a change that replaces every page: when someone else is in the design, asks first and resolves
+ * with the answer. Returns plain `true` (no promise, so the change can happen synchronously) when nobody
+ * else is here (always, on the local editor) or the design is view only (the change itself then says so).
  */
-export function confirmReplaceAll(): Promise<boolean> {
+export function confirmReplaceAll(): true | Promise<boolean> {
   const { others } = useCloudStore.getState();
-  if (!others.length || useStudioStore.getState().readOnly) return Promise.resolve(true);
+  if (!others.length || useStudioStore.getState().readOnly) return true;
   if (pending) return pending.promise;
   let resolve!: (ok: boolean) => void;
   const promise = new Promise<boolean>((r) => { resolve = r; });

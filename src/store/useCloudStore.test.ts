@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { colorFor } from '@/lib/cloud/presence';
+import { fillYear, setYear } from './actions';
 import { confirmReplaceAll, useCloudStore } from './useCloudStore';
-import { useStudioStore } from './useStudioStore';
+import { freshDoc, useStudioStore } from './useStudioStore';
 
 const ana = { key: 't1', uid: 'u1', name: 'Ana', color: colorFor('u1'), page: 0, sel: [] };
 
@@ -11,8 +12,8 @@ describe('confirmReplaceAll', () => {
     useStudioStore.setState({ readOnly: false });
   });
 
-  it('resolves true at once when nobody else is here', async () => {
-    await expect(confirmReplaceAll()).resolves.toBe(true);
+  it('returns true at once (no promise) when nobody else is here', () => {
+    expect(confirmReplaceAll()).toBe(true);
     expect(useCloudStore.getState().replacing).toBeNull();
   });
 
@@ -34,5 +35,37 @@ describe('confirmReplaceAll', () => {
     const a = confirmReplaceAll();
     useCloudStore.getState().begin(null);
     await expect(a).resolves.toBe(false);
+  });
+});
+
+describe('whole-design actions', () => {
+  beforeEach(() => {
+    useCloudStore.getState().begin(null);
+    useStudioStore.setState({ readOnly: false, historyDriver: null, onLocalChange: null });
+    useStudioStore.getState().hydrate(freshDoc());
+  });
+
+  it('run synchronously on the local editor (nobody else here)', () => {
+    expect(setYear(2031)).toBeUndefined();
+    expect(useStudioStore.getState().doc.year).toBe(2031);
+    useStudioStore.getState().mutate((d) => void (d.cur = 4));
+    const before = useStudioStore.getState().doc.pages.length;
+    expect(fillYear()).toBeUndefined();
+    expect(useStudioStore.getState().doc.pages.length).toBeLessThan(before);
+  });
+
+  it('wait for the answer when someone else is here; Cancel changes nothing', async () => {
+    useCloudStore.getState().patch({ others: [ana] });
+    const year = useStudioStore.getState().doc.year;
+    const pending = setYear(2032);
+    expect(pending).toBeInstanceOf(Promise);
+    expect(useStudioStore.getState().doc.year).toBe(year);
+    useCloudStore.getState().answerReplace(false);
+    await pending;
+    expect(useStudioStore.getState().doc.year).toBe(year);
+    const again = setYear(2033);
+    useCloudStore.getState().answerReplace(true);
+    await again;
+    expect(useStudioStore.getState().doc.year).toBe(2033);
   });
 });
