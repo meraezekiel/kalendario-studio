@@ -5,6 +5,10 @@ import { AFTER_SIGN_IN } from '@/store/useAuthStore';
 
 type Phase = 'working' | 'new-password' | 'failed';
 
+const EXPIRED = 'This link has expired or was already used. Please sign in, or ask for a new link.';
+const OTHER_BROWSER =
+  'Your email may already be confirmed. If you signed up in another browser, sign in here or there. A password reset link only works in the browser where you asked for it.';
+
 /** Finishes an email link (confirm sign-up, reset password, or OAuth): swaps ?code= for a session. */
 export function useAuthCallbackHandler() {
   const router = useRouter();
@@ -31,7 +35,9 @@ export function useAuthCallbackHandler() {
         // auth-js returns redirectType ('recovery' for a reset link) but its types leave it out.
         const recovery = (data as { redirectType?: string | null }).redirectType === 'recovery';
         if (e) {
-          setError('This link has expired or was already used. Please sign in, or ask for a new link.');
+          // No PKCE verifier here: the link was asked for in another browser. A sign-up link has confirmed
+          // the email anyway (only the sign-in failed); a reset link can't be told apart from it.
+          setError(e.code === 'pkce_code_verifier_not_found' ? OTHER_BROWSER : EXPIRED);
           setPhase('failed');
         } else if (recovery) {
           setPhase('new-password');

@@ -49,6 +49,20 @@ test('sign up shows "Check your email" and does not sign in', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Account' })).toHaveCount(0);
 });
 
+test('an email link opened in another browser says the email may already be confirmed', async ({ page }) => {
+  const errors = watchErrors(page);
+  // A fresh browser holds no PKCE verifier, as when the confirmation email is opened on another device.
+  await page.goto(`/auth/callback?code=${randomUUID()}`);
+  const card = page.locator('.auth-card');
+  await expect(card.getByRole('alert')).toHaveText(
+    'Your email may already be confirmed. If you signed up in another browser, sign in here or there. A password reset link only works in the browser where you asked for it.',
+  );
+  await expect(card).not.toContainText('expired');
+  await card.getByRole('link', { name: 'Go to sign in' }).click();
+  await expect(page).toHaveURL(/\/login/);
+  expect(errors).toEqual([]);
+});
+
 test('confirmed user signs in and sees their email in the account menu', async ({ page }) => {
   const user = await newUser();
   await signIn(page, user);
