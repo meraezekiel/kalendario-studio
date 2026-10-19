@@ -29,16 +29,23 @@ export async function makeUser(address = email(), { confirmed = true } = {}): Pr
   return user;
 }
 
-/** An anon-key client signed in as `user`. */
+const signedIn = new Map<string, SupabaseClient>();
+
+/** An anon-key client signed in as `user`; one per user, since auth rate-limits sign-ins. */
 export async function as(user: TestUser): Promise<SupabaseClient> {
+  const known = signedIn.get(user.id);
+  if (known) return known;
   const c = createClient(url!, anon!, opts);
   const { error } = await c.auth.signInWithPassword({ email: user.email, password: user.password });
   if (error) throw error;
+  signedIn.set(user.id, c);
   return c;
 }
 
 /** Deletes every user made since the last cleanup; their designs and templates cascade. */
 export async function cleanup() {
+  for (const c of signedIn.values()) c.removeAllChannels();
+  signedIn.clear();
   const users = made.splice(0);
   for (const u of users) {
     const { error } = await admin.auth.admin.deleteUser(u.id);

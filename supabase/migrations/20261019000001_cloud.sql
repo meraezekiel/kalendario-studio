@@ -116,6 +116,8 @@ begin
   if coalesce(public.design_role(d), '') not in ('owner', 'editor') then
     raise exception 'not allowed' using errcode = '42501';
   end if;
+  -- Same per-design lock as design_updates_before_insert: waits out in-flight appends.
+  perform pg_advisory_xact_lock(hashtext('upd:' || d::text));
   update public.designs g set state = new_state, compacted_through = through
   where g.id = d
     and g.compacted_through < through
@@ -135,6 +137,23 @@ language sql stable security definer set search_path = ''
 as $$ select coalesce(sum(p.bytes), 0)::bigint from public.photos p where p.owner = auth.uid() $$;
 
 -- ---------------------------------------------------------------- triggers
+
+-- Appends to one design are serialized and take their id only after the lock, which is held until
+-- commit, so ids commit in order: any snapshot that sees update N also sees every earlier one.
+-- That is what lets compact_design drop updates <= through without losing one still in flight.
+-- (A shared lock would not do: two concurrent appends could commit out of id order.)
+create function public.design_updates_before_insert()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  perform pg_advisory_xact_lock(hashtext('upd:' || new.design_id::text));
+  new.id := nextval(pg_get_serial_sequence('public.design_updates', 'id'));
+  return new;
+end
+$$;
+create trigger design_updates_before_insert before insert on public.design_updates
+  for each row execute function public.design_updates_before_insert();
 
 create function public.designs_before_insert()
 returns trigger
@@ -283,6 +302,12 @@ create policy photos_insert on public.photos for insert to authenticated
     or (template_id is not null and exists (
       select 1 from public.templates t where t.id = template_id and t.owner = auth.uid()))
   );
+-- Delete the storage object first, then this row: the object's delete policy needs the row.
+create policy photos_delete on public.photos for delete to authenticated
+  using (
+    public.design_role(design_id) in ('owner', 'editor')
+    or (template_id is not null and owner = auth.uid())
+  );
 
 -- ---------------------------------------------------------------- realtime
 
@@ -312,3 +337,41 @@ create policy photos_object_insert on storage.objects for insert to authenticate
     where p.path = storage.objects.name
       and (public.design_role(p.design_id) in ('owner', 'editor')
         or exists (select 1 from public.templates t where t.id = p.template_id and t.owner = auth.uid()))));
+
+-- An object can be deleted while its photos row is still there and deletable by the user
+-- (same rule as photos_delete). Delete the object first, then the row.
+create policy photos_object_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'photos' and exists (
+    select 1 from public.photos p
+    where p.path = storage.objects.name
+      and (public.design_role(p.design_id) in ('owner', 'editor')
+        or (p.template_id is not null and p.owner = auth.uid()))));
+
+-- The quota counts real object sizes, not what the client declared: once storage records an
+-- object's size, it overwrites photos.bytes and re-checks the owner's total.
+create function public.photos_object_size()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  o uuid;
+  used bigint;
+begin
+  if new.bucket_id <> 'photos' or new.metadata is null or not (new.metadata ? 'size') then
+    return null;
+  end if;
+  select p.owner into o from public.photos p where p.path = new.name;
+  if o is null then
+    return null;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('photos:' || o::text));
+  update public.photos p set bytes = greatest((new.metadata->>'size')::bigint, 1)::int where p.path = new.name;
+  select coalesce(sum(p.bytes), 0) into used from public.photos p where p.owner = o;
+  if used > (select l.photo_bytes from public.app_limits() l) then
+    raise exception 'photo storage limit reached' using errcode = 'P0001';
+  end if;
+  return null;
+end
+$$;
+create trigger photos_object_size after insert or update of metadata on storage.objects
+  for each row execute function public.photos_object_size();

@@ -1,9 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { afterEach, describe, expect, it } from 'vitest';
-import { admin, as, cleanup, email, makeUser } from './helpers';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { admin, as, cleanup, email, makeUser, type TestUser } from './helpers';
 
-afterEach(cleanup);
+// One pool of throwaway users per run (signed in once each: auth rate-limits sign-ins);
+// their designs, which cascade to members, updates and photos rows, are wiped after every test.
+let pool: Record<'o' | 'v' | 'e' | 's', TestUser>;
+beforeAll(async () => {
+  const [o, v, e, s] = await Promise.all([makeUser(), makeUser(), makeUser(), makeUser()]);
+  pool = { o, v, e, s };
+});
+afterEach(async () => {
+  const { error } = await admin.from('designs').delete().in('owner', Object.values(pool).map((u) => u.id));
+  if (error) throw error;
+});
+afterAll(cleanup);
 
 const FILE_LIMIT = 5242880;
 
@@ -31,7 +42,7 @@ async function count(table: string, column: string, value: string) {
 
 /** Owner, a design, and clients for a viewer, an editor and a stranger. */
 async function cast() {
-  const [o, v, e, s] = await Promise.all([makeUser(), makeUser(), makeUser(), makeUser()]);
+  const { o, v, e, s } = pool;
   const owner = await as(o);
   const design = await newDesign(owner);
   await share(owner, design.id, v.email, 'viewer');
@@ -132,7 +143,7 @@ describe('designs RLS', () => {
 
 describe('sharing', () => {
   it('share to existing confirmed user links user_id immediately', async () => {
-    const [o, m] = await Promise.all([makeUser(), makeUser()]);
+    const { o, v: m } = pool;
     const owner = await as(o);
     const design = await newDesign(owner);
     const row = await share(owner, design.id, m.email, 'viewer');
@@ -146,7 +157,7 @@ describe('sharing', () => {
   });
 
   it('share to unknown email links when that email signs up and confirms, not before', async () => {
-    const o = await makeUser();
+    const o = pool.o;
     const owner = await as(o);
     const design = await newDesign(owner);
     const address = email();
@@ -173,7 +184,7 @@ describe('sharing', () => {
 
 describe('limits', () => {
   it('51st design is rejected with "design limit reached"', async () => {
-    const owner = await as(await makeUser());
+    const owner = await as(pool.o);
     const rows = Array.from({ length: 50 }, (_, i) => ({ name: `D${i}` }));
     const ok = await owner.from('designs').insert(rows);
     expect(ok.error).toBeNull();
@@ -182,7 +193,7 @@ describe('limits', () => {
   });
 
   it('photos row over 50 MB total is rejected with "photo storage limit reached"', async () => {
-    const owner = await as(await makeUser());
+    const owner = await as(pool.o);
     const design = await newDesign(owner);
     const photo = (bytes: number) => ({ path: `${design.id}/${randomUUID()}.jpg`, design_id: design.id, bytes });
     const ok = await owner.from('photos').insert(Array.from({ length: 10 }, () => photo(FILE_LIMIT)));
@@ -195,7 +206,7 @@ describe('limits', () => {
   });
 
   it('single photos row with bytes > 5242880 is rejected', async () => {
-    const owner = await as(await makeUser());
+    const owner = await as(pool.o);
     const design = await newDesign(owner);
     const big = await owner.from('photos').insert({ path: `${design.id}/${randomUUID()}.jpg`, design_id: design.id, bytes: FILE_LIMIT + 1 });
     expect(big.error).not.toBeNull();
@@ -214,7 +225,7 @@ describe('limits', () => {
 
 describe('compaction', () => {
   it('compact_design ignores a stale compaction', async () => {
-    const owner = await as(await makeUser());
+    const owner = await as(pool.o);
     const design = await newDesign(owner);
     const ids: number[] = [];
     for (const d of ['u1', 'u2', 'u3']) ids.push((await push(owner, design.id, d)).data!.id);
@@ -230,7 +241,7 @@ describe('compaction', () => {
   });
 
   it('compact_design refuses to skip past the newest update', async () => {
-    const owner = await as(await makeUser());
+    const owner = await as(pool.o);
     const design = await newDesign(owner);
     const id = (await push(owner, design.id, 'u1')).data!.id;
     const res = await owner.rpc('compact_design', { d: design.id, new_state: 's', through: id + 1000 });
@@ -238,10 +249,43 @@ describe('compaction', () => {
   });
 
   it('clients cannot set compacted_through directly', async () => {
-    const owner = await as(await makeUser());
+    const owner = await as(pool.o);
     const design = await newDesign(owner);
     const res = await owner.from('designs').update({ compacted_through: 99 }).eq('id', design.id);
     expect(res.error).not.toBeNull();
+  });
+
+  it('compaction racing parallel appends never drops an update', async () => {
+    const o = pool.o;
+    const writers = await Promise.all([as(o), as(o), as(o), as(o)]);
+    const owner = writers[0];
+    const design = await newDesign(owner);
+    const sent = writers.flatMap((_, w) => Array.from({ length: 15 }, (_, i) => `w${w}-${i}`));
+
+    // Engine-style compaction: load, fold state + loaded updates, compact through the newest loaded id.
+    const items = (l: { state: string; updates: { data: string }[] }) =>
+      [...(l.state ? l.state.split(',') : []), ...l.updates.map((u) => u.data)];
+    async function compactOnce() {
+      const { data, error } = await owner.rpc('load_design', { d: design.id });
+      if (error) throw error;
+      const l = data[0] as { state: string; through: number; updates: { id: number; data: string }[] };
+      const through = l.updates.reduce((m, u) => Math.max(m, u.id), l.through);
+      const res = await owner.rpc('compact_design', { d: design.id, new_state: items(l).join(','), through });
+      if (res.error) throw res.error;
+    }
+
+    let writing = true;
+    const appends = Promise.all(writers.map(async (c, w) => {
+      for (let i = 0; i < 15; i++) {
+        const r = await push(c, design.id, `w${w}-${i}`);
+        if (r.error) throw r.error;
+      }
+    })).finally(() => { writing = false; });
+    const compactions = (async () => { while (writing) await compactOnce(); })();
+    await Promise.all([appends, compactions]);
+
+    const { data } = await owner.rpc('load_design', { d: design.id });
+    expect(new Set(items(data[0]))).toEqual(new Set(sent));
   });
 });
 
@@ -264,6 +308,77 @@ describe('storage', () => {
       expect(hidden.error).not.toBeNull();
     } finally {
       await admin.storage.from('photos').remove([path]);
+    }
+  });
+
+  const png = (n: number) => new Blob([new Uint8Array(n).fill(7)], { type: 'image/png' });
+
+  /** Declares a photos row in `design`, uploads `size` bytes to it as `c`, returns the path. */
+  async function addPhoto(c: SupabaseClient, designId: string, declared: number, size = declared) {
+    const path = `${designId}/${randomUUID()}.png`;
+    const row = await c.from('photos').insert({ path, design_id: designId, bytes: declared });
+    if (row.error) throw row.error;
+    const up = await c.storage.from('photos').upload(path, png(size), { contentType: 'image/png' });
+    return { path, error: up.error };
+  }
+
+  it('owner deletes object then row and usage drops; editor can too; viewer and stranger cannot', async () => {
+    const { owner, editor, viewer, stranger, design } = await cast();
+    const a = await addPhoto(owner, design.id, 100);
+    const b = await addPhoto(editor, design.id, 200);
+    expect(a.error).toBeNull();
+    expect(b.error).toBeNull();
+    expect((await owner.rpc('photo_usage')).data).toBe(300);
+
+    for (const c of [viewer, stranger]) {
+      const obj = await c.storage.from('photos').remove([a.path]);
+      expect(obj.data ?? []).toHaveLength(0);
+      const row = await c.from('photos').delete().eq('path', a.path).select();
+      expect(row.data ?? []).toHaveLength(0);
+    }
+    expect(await count('photos', 'design_id', design.id)).toBe(2);
+    expect((await owner.storage.from('photos').download(a.path)).error).toBeNull();
+
+    const objA = await owner.storage.from('photos').remove([a.path]);
+    expect(objA.data).toHaveLength(1);
+    expect((await owner.from('photos').delete().eq('path', a.path).select()).data).toHaveLength(1);
+    expect((await owner.rpc('photo_usage')).data).toBe(200);
+
+    const objB = await editor.storage.from('photos').remove([b.path]);
+    expect(objB.data).toHaveLength(1);
+    expect((await editor.from('photos').delete().eq('path', b.path).select()).data).toHaveLength(1);
+    expect((await owner.rpc('photo_usage')).data).toBe(0);
+  });
+
+  it('quota counts the uploaded size, not the declared bytes', async () => {
+    const owner = await as(pool.o);
+    const design = await newDesign(owner);
+    const p = await addPhoto(owner, design.id, 1, 1000);
+    try {
+      expect(p.error).toBeNull();
+      const { data } = await admin.from('photos').select('bytes').eq('path', p.path).single();
+      expect(data!.bytes).toBe(1000);
+      expect((await owner.rpc('photo_usage')).data).toBe(1000);
+    } finally {
+      await admin.storage.from('photos').remove([p.path]);
+    }
+  });
+
+  it('an upload larger than declared is rejected when it would pass the cap', async () => {
+    const owner = await as(pool.o);
+    const design = await newDesign(owner);
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      path: `${design.id}/${randomUUID()}.jpg`, design_id: design.id, bytes: i === 9 ? FILE_LIMIT - 1000 : FILE_LIMIT,
+    }));
+    expect((await owner.from('photos').insert(rows)).error).toBeNull();
+    const p = await addPhoto(owner, design.id, 1, 2000);
+    try {
+      expect(p.error).not.toBeNull();
+      const { data } = await admin.from('photos').select('bytes').eq('path', p.path).single();
+      expect(data!.bytes).toBe(1);
+      expect((await admin.storage.from('photos').list(design.id)).data ?? []).toHaveLength(0);
+    } finally {
+      await admin.storage.from('photos').remove([p.path]);
     }
   });
 });
