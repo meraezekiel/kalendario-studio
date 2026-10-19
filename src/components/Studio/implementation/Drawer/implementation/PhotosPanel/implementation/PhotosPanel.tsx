@@ -19,7 +19,7 @@ export default function PhotosPanel() {
               onClick={() => toggleArm(i)}
               role="button"
               aria-label={`Photo ${i + 1}${armed === i ? ', ready to place' : ''}`}
-              style={{ backgroundImage: `url('${src}')` }}
+              style={src ? { backgroundImage: `url('${src}')` } : undefined}
             >
               <button className="x" aria-label="Remove photo" onClick={(e) => { e.stopPropagation(); remove(i); }}>✕</button>
               <button aria-label="Add to page" title="Add to page" onClick={(e) => { e.stopPropagation(); addToPage(id); }}>+</button>

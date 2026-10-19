@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { offerThanks } from '@/store/actions';
+import { loadPhotos } from '@/store/usePhotoUrlStore';
 import { curPage, toast, useStudioStore } from '@/store/useStudioStore';
 
 /** While exporting, renders the current page offscreen and downloads it as a 2.5× PNG. */
@@ -15,6 +16,8 @@ export function useExportBoxHandler() {
     (async () => {
       try {
         await document.fonts.ready;
+        // Cloud photos must be downloaded and drawn first, or the PNG gets empty frames.
+        await loadPhotos(Object.values(useStudioStore.getState().doc.assets).map((a) => a.src));
         const node = ref.current?.firstElementChild as HTMLElement | null;
         if (!node || cancelled) return;
         const url = await toPng(node, { pixelRatio: 2.5 });

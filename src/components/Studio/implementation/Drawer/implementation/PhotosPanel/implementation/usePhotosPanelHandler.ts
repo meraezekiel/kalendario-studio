@@ -1,6 +1,7 @@
 import type { DragEvent } from 'react';
 import { ASSET_MIME } from '@/lib/calendar/constants';
 import { pickFiles, placeAsset, removeTrayItem } from '@/store/actions';
+import { usePhotoUrls } from '@/store/usePhotoUrlStore';
 import { useStudioStore } from '@/store/useStudioStore';
 
 export function usePhotosPanelHandler() {
@@ -8,7 +9,10 @@ export function usePhotosPanelHandler() {
   const assets = useStudioStore((s) => s.doc.assets);
   const armed = useStudioStore((s) => s.armed);
 
-  const items = tray.flatMap((id, i) => (assets[id] ? [{ id, i, src: assets[id].src }] : []));
+  const listed = tray.flatMap((id, i) => (assets[id] ? [{ id, i, src: assets[id].src }] : []));
+  // Cloud photos show once downloaded (null until then: a blank tile).
+  const urls = usePhotoUrls(listed.map((t) => t.src));
+  const items = listed.map((t, k) => ({ ...t, src: urls[k] }));
 
   return {
     items,

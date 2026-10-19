@@ -1,9 +1,12 @@
 import { type KeyboardEvent, useLayoutEffect, useRef } from 'react';
+import { usePhotoUrl } from '@/store/usePhotoUrlStore';
 import { useStudioStore } from '@/store/useStudioStore';
 
-/** Inline editing of a day number (double-click a number in the calendar). */
-export function useDayCellHandler(calId: string, day: number | null, num: string | null, editing: boolean) {
+/** Inline editing of a day number (double-click a number in the calendar), and the day's photo to show. */
+export function useDayCellHandler(calId: string, day: number | null, num: string | null, editing: boolean, src: string | null) {
   const ref = useRef<HTMLSpanElement>(null);
+  /** Null while a cloud photo is on its way: the box shows as it does without one. */
+  const img = usePhotoUrl(src);
 
   useLayoutEffect(() => {
     const n = ref.current;
@@ -36,5 +39,5 @@ export function useDayCellHandler(calId: string, day: number | null, num: string
     }
   };
 
-  return { ref, commit, onKeyDown };
+  return { ref, commit, onKeyDown, img };
 }

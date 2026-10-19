@@ -17,6 +17,7 @@ export interface CellView {
   numStyle: CSSProperties;
   label: string;
   labelStyle: CSSProperties;
+  /** The day's photo source (may be a cloud `sb:` one; DayCell resolves it and adds `hasimg`). */
   img: string | null;
   moon?: MoonView;
 }
@@ -132,7 +133,7 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
     return {
       key: i,
       day: n,
-      className: `cell${img ? ' hasimg' : ''}${dsel ? ' dsel' : ''}`,
+      className: `cell${dsel ? ' dsel' : ''}`,
       style: { ...bord, ...rad, background: info.bg || el.cellBg, ...align },
       num: info.num ?? String(n),
       numStyle: { ...numBase, color: hi ? el.hiColor : el.numColor },

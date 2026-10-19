@@ -13,6 +13,9 @@ import { giveCal, TEMPLATES } from '@/lib/calendar/templates';
 import { markThanksSeen, thanksSeen } from '@/lib/support/support';
 import type { CalEl, El, Page, ShapeEl, ShapeKind, SheetSettings } from '@/lib/calendar/types';
 import { clamp, clone, uid } from '@/lib/calendar/utils';
+import { cloudPath, deletePhoto, embedPhotos, photosOf, UnreadableImage, uploadPhoto } from '@/lib/cloud/photos';
+import { CloudError } from '@/lib/cloud/transport';
+import { useCloudStore } from './useCloudStore';
 import { curPage, findEl, type PickTarget, selIds, toast, useStudioStore } from './useStudioStore';
 
 const S = () => useStudioStore.getState();
@@ -120,17 +123,35 @@ export function addGraphic(key: string, pt?: { x: number; y: number }) {
 
 /* ---------- photos ---------- */
 
+const PHOTO_SPACE_FULL = 'Your 50 MB photo space is full. Remove photos from your designs to add more.';
+const PHOTO_OFFLINE = "You're offline. Photos can be added once you're back online.";
+
+/**
+ * Reads picked images into the doc's assets and tray, returning their ids. In a cloud design each is
+ * uploaded once and kept as `sb:<path>`; elsewhere it's a data URL.
+ */
 export async function addFiles(files: File[]): Promise<string[]> {
   const ids: string[] = [];
   const read: { id: string; a: Awaited<ReturnType<typeof readImage>> }[] = [];
+  const designId = useCloudStore.getState().designId;
+  if (designId && S().readOnly) {
+    S().mutate(() => {}); // says the design is view only
+    return ids;
+  }
   for (const f of files) {
     if (!f.type.startsWith('image/')) continue;
     try {
-      read.push({ id: 'a' + uid(), a: await readImage(f) });
-    } catch {
-      toast(`Couldn't read ${f.name}. Try a JPG or PNG.`);
+      read.push({ id: 'a' + uid(), a: designId ? await uploadPhoto(designId, f) : await readImage(f) });
+    } catch (e) {
+      if (!designId || e instanceof UnreadableImage) toast(`Couldn't read ${f.name}. Try a JPG or PNG.`);
+      else if (e instanceof CloudError && (e.code === 'limit' || e.code === 'offline')) {
+        toast(e.code === 'limit' ? PHOTO_SPACE_FULL : PHOTO_OFFLINE);
+        break; // the rest would fail the same way
+      } else toast(`Couldn't add ${f.name}. Please try again.`);
     }
   }
+  // Left the design while uploading: these belong to it, not to whatever is open now.
+  if (designId && useCloudStore.getState().designId !== designId) return [];
   if (!read.length) return ids;
   S().mutate((d) => {
     for (const { id, a } of read) {
@@ -225,13 +246,22 @@ export function pickMonthBackgrounds() {
   inp.click();
 }
 
+/** Removes a photo from the tray; one no element uses is deleted (in a cloud design, its stored file too). */
 export function removeTrayItem(i: number) {
   S().set({ armed: null });
+  let freed: string | null = null;
   S().mutate((d) => {
     const id = d.tray[i];
     d.tray.splice(i, 1);
-    if (!assetInUse(d, id)) delete d.assets[id];
+    if (!assetInUse(d, id)) {
+      freed = cloudPath(d.assets[id]?.src);
+      delete d.assets[id];
+    }
   }, { history: false });
+  const path = freed as string | null;
+  if (path && useCloudStore.getState().designId) {
+    deletePhoto(path).catch(() => toast("The photo is removed, but its space couldn't be freed right now."));
+  }
 }
 
 /* ---------- element commands ---------- */
@@ -503,8 +533,16 @@ export function setSheet(patch: Partial<SheetSettings>) {
 /* ---------- design files ---------- */
 
 /** Downloads the whole calendar, photos included, as one file to keep or move to another computer. */
-export function saveDesignFile() {
-  const { doc } = S();
+export async function saveDesignFile() {
+  let { doc } = S();
+  // Cloud photos go into the file as data, so it opens anywhere, signed in or not.
+  if (photosOf(doc).length) {
+    try {
+      doc = await embedPhotos(doc);
+    } catch {
+      return toast("Couldn't get this design's photos. Check your connection and try again.");
+    }
+  }
   const url = URL.createObjectURL(new Blob([serializeDesign(doc)], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;

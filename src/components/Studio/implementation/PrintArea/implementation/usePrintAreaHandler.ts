@@ -3,6 +3,7 @@ import { DW } from '@/lib/calendar/constants';
 import { dims } from '@/lib/calendar/document';
 import { sheetLayout, toSheets } from '@/lib/calendar/sheet';
 import { offerThanks } from '@/store/actions';
+import { loadPhotos } from '@/store/usePhotoUrlStore';
 import { useStudioStore } from '@/store/useStudioStore';
 
 /** Renders the requested pages at paper size (or several per sheet), sets @page size, then opens the print dialog. */
@@ -30,7 +31,9 @@ export function usePrintAreaHandler() {
     };
     addEventListener('afterprint', finish, { once: true });
     const t = setTimeout(() => {
-      document.fonts.ready.then(() => {
+      // Cloud photos are downloaded and on the pages before the dialog opens.
+      const photos = loadPhotos(Object.values(useStudioStore.getState().doc.assets).map((a) => a.src));
+      Promise.all([document.fonts.ready, photos]).then(() => {
         window.print();
         // print() blocks until the dialog closes; this covers browsers that skip afterprint.
         setTimeout(finish, 500);

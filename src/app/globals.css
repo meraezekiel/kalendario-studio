@@ -247,6 +247,7 @@ a.btn.primary{color:#fff}
 .acct-who{padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:4px;min-width:0}
 .acct-who b{display:block;font-size:13px}
 .acct-who span{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-who .acct-usage{margin-top:6px}
 .acct-item{display:block;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:8px 10px;font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;cursor:pointer}
 .acct-item:hover,.acct-item:focus-visible{background:var(--accent-soft);color:var(--accent);outline:none}
 .auth-page{min-height:100%;display:grid;place-items:center;padding:16px}

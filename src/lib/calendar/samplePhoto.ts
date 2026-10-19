@@ -70,20 +70,20 @@ export function samplePhoto(m: number): Asset {
   return (cache[m] = { src: c.toDataURL('image/jpeg', 0.85), w: 1200, h: 800 });
 }
 
-/** Downscales an uploaded image to at most 2000px and returns it as a data URL asset. */
-export function readImage(file: File): Promise<Asset> {
+/** Downscales an uploaded image to at most `max` px and returns it as a data URL asset (PNG when it may be transparent). */
+export function readImage(file: File, max = 2000, quality = 0.9): Promise<Asset> {
   return new Promise((res, rej) => {
     const r = new FileReader();
     r.onload = () => {
       const im = new Image();
       im.onload = () => {
-        const k = Math.min(1, 2000 / Math.max(im.width, im.height));
+        const k = Math.min(1, max / Math.max(im.width, im.height));
         const c = document.createElement('canvas');
         c.width = Math.round(im.width * k);
         c.height = Math.round(im.height * k);
         c.getContext('2d')!.drawImage(im, 0, 0, c.width, c.height);
         const alpha = /png|webp|gif/.test(file.type);
-        res({ src: c.toDataURL(alpha ? 'image/png' : 'image/jpeg', 0.9), w: c.width, h: c.height });
+        res({ src: c.toDataURL(alpha ? 'image/png' : 'image/jpeg', quality), w: c.width, h: c.height });
       };
       im.onerror = rej;
       im.src = r.result as string;

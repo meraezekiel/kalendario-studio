@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { photoUsage } from '@/lib/cloud/photos';
 import { cloudEnabled } from '@/lib/cloud/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
+
+/** Bytes as MB with one decimal; anything stored shows as at least 0.1. */
+const mb = (bytes: number) => (bytes > 0 ? Math.max(0.1, bytes / 1048576) : 0).toFixed(1);
 
 export function useAccountMenuHandler() {
   const router = useRouter();
@@ -11,6 +15,20 @@ export function useAccountMenuHandler() {
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => useAuthStore.getState().init(), []);
+
+  // Photo space used, fetched fresh each time the menu opens; hidden when it can't be read.
+  const [used, setUsed] = useState<number | null>(null);
+  useEffect(() => {
+    if (!open || !user) return;
+    let live = true;
+    photoUsage().then(
+      (b) => live && setUsed(b),
+      () => live && setUsed(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [open, user]);
 
   // Close on a click outside or Escape.
   useEffect(() => {
@@ -46,7 +64,11 @@ export function useAccountMenuHandler() {
     user,
     initial: (user?.name || user?.email || '?').charAt(0).toUpperCase(),
     open,
-    toggle: () => setOpen((o) => !o),
+    usage: used == null ? null : `${mb(used)} MB of 50 MB used`,
+    toggle: () => {
+      setUsed(null); // no stale figure while the fresh one loads
+      setOpen((o) => !o);
+    },
     box,
     signOut,
   };

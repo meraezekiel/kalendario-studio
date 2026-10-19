@@ -11,10 +11,10 @@ interface Props {
 }
 
 export default function DayCell({ cell, calId, editing }: Props) {
-  const { ref, commit, onKeyDown } = useDayCellHandler(calId, cell.day, cell.num, editing);
+  const { ref, commit, onKeyDown, img } = useDayCellHandler(calId, cell.day, cell.num, editing, cell.img);
   return (
-    <div className={cell.className} data-day={cell.day ?? undefined} style={cell.style}>
-      {cell.img && <div className="cimg" style={{ backgroundImage: `url('${cell.img}')` }} />}
+    <div className={`${cell.className}${img ? ' hasimg' : ''}`} data-day={cell.day ?? undefined} style={cell.style}>
+      {img && <div className="cimg" style={{ backgroundImage: `url('${img}')` }} />}
       {cell.num != null &&
         (editing ? (
           // Separate key: the editable span's text is owned by the browser while typing, not React.

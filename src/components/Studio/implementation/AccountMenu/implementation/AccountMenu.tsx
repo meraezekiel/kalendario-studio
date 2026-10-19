@@ -24,6 +24,7 @@ export default function AccountMenu() {
           <div className="acct-who">
             <b>{h.user.name}</b>
             <span>{h.user.email}</span>
+            {h.usage && <span className="acct-usage" data-testid="photo-usage">{h.usage}</span>}
           </div>
           <Link className="acct-item" role="menuitem" href="/designs">
             My designs
