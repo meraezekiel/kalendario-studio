@@ -8,17 +8,21 @@
     "start": "next start -p 3100",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:cloud": "vitest run -c vitest.cloud.config.mts",
+    "db:push": "supabase db push",
     "e2e": "playwright test",
     "graphics": "node scripts/build-graphics.mjs && node scripts/build-peeps.mjs",
     "social": "node scripts/build-social.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "html-to-image": "^1.11.13",
     "idb-keyval": "^6.3.0",
     "immer": "^11.1.21",
     "next": "^16.4.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "y-indexeddb": "^9.0.12",
     "yjs": "^13.6.33",
     "zustand": "^5.0.15"
   },
@@ -32,6 +36,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "simple-icons": "^13.21.0",
+    "supabase": "^2.121.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.4"
   }
