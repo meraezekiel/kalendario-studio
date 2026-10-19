@@ -86,3 +86,41 @@ export function confirmReplaceAll(): true | Promise<boolean> {
   useCloudStore.setState({ replacing: whoElse(others) });
   return promise;
 }
+
+/** Sends the open cloud design's pending edits (set by the cloud session while one is open). */
+let flusher: (() => Promise<void>) | null = null;
+
+/** The cloud session offers its `flush`; returns the matching "withdraw". */
+export function provideFlush(fn: () => Promise<void>): () => void {
+  flusher = fn;
+  return () => {
+    if (flusher === fn) flusher = null;
+  };
+}
+
+/**
+ * Tries to send the open design's pending edits, then waits up to `ms` for every one of them to be
+ * saved. Resolves true once nothing is pending, false when time ran out (offline, say). Never rejects.
+ */
+export async function saveAll(ms: number): Promise<boolean> {
+  const saved = () => !useCloudStore.getState().status.pending;
+  const until = Date.now() + ms;
+  while (!saved()) {
+    const left = until - Date.now();
+    if (left <= 0) return false;
+    // One send attempt (it resolves even when it fails), then a moment for the status to catch up.
+    const tick = Math.min(left, 2000);
+    await Promise.race([flusher?.().catch(() => {}), new Promise((r) => setTimeout(r, tick))]);
+    if (saved()) break;
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(done, Math.max(0, Math.min(until - Date.now(), 1000)));
+      const off = useCloudStore.subscribe((s) => !s.status.pending && done());
+      function done() {
+        clearTimeout(t);
+        off();
+        resolve();
+      }
+    });
+  }
+  return true;
+}

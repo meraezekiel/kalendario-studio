@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import SignOutConfirm from './SignOutConfirm/implementation/SignOutConfirm';
 import { useAccountMenuHandler } from './useAccountMenuHandler';
 
 /** Top bar account control: "Sign in" when signed out, otherwise an initial avatar with a small menu. */
@@ -34,6 +35,7 @@ export default function AccountMenu() {
           </button>
         </div>
       )}
+      <SignOutConfirm />
     </div>
   );
 }

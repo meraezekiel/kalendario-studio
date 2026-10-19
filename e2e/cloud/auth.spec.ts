@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { openStudio } from '../helpers';
-import { cleanupUsers, cloudConfigured, newUser, signIn, testEmail } from './helpers';
+import { cleanupUsers, cloudConfigured, newDesign, newUser, signIn, testEmail } from './helpers';
 
 test.skip(!cloudConfigured, 'needs the TEST Supabase project (.env.test.local)');
 test.afterAll(cleanupUsers);
@@ -82,4 +82,125 @@ test('signed-out top bar shows "Sign in" and the editor still works', async ({ p
   await expect(page.getByTestId('insp-title')).toHaveText('Caption');
   expect(calls).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+/** Names of this origin's offline design copies (y-indexeddb databases). */
+const designDbs = (page: Page) =>
+  page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name ?? '').filter((n) => n.startsWith('kal-design-')));
+
+async function addHeading(page: Page, text: string) {
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: 'Add a heading' }).click();
+  await page.locator('.insp textarea').fill(text);
+  await expect(page.locator('.ph .tx', { hasText: text })).toBeVisible();
+}
+
+/** Records runtime errors, ignoring failed requests (Supabase unreachable, external fonts). */
+function watchErrors(page: Page) {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => {
+    if (m.type() !== 'error') return;
+    if (/Failed to load resource|ERR_INTERNET_DISCONNECTED|WebSocket|fonts\.(googleapis|gstatic)/.test(m.text())) return;
+    errors.push(m.text());
+  });
+  return errors;
+}
+
+async function startSignOut(page: Page) {
+  await page.getByRole('button', { name: 'Account' }).click();
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Sign out' }).click();
+}
+
+test('sign out with unsynced changes asks first; Sign out anyway clears local design cache', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  const user = await newUser();
+  await signIn(page, user);
+  const id = await newDesign(page);
+  await expect(page.getByTestId('sync-state')).toHaveText('Saved');
+  await expect.poll(() => designDbs(page)).toContain(`kal-design-${id}`);
+  expect(await page.evaluate(() => localStorage.getItem('kal-design-dbs'))).toContain(id);
+
+  // Supabase unreachable (the app itself still loads): edits can't be sent, nor can the sign-out.
+  // (Fully offline, the dev server couldn't serve / either.)
+  await page.route('**/rest/v1/design_updates**', (r) => r.abort('internetdisconnected'));
+  await page.route('**/auth/v1/logout**', (r) => r.abort('internetdisconnected'));
+  await addHeading(page, 'Not synced yet');
+  await expect(page.getByTestId('sync-state')).not.toHaveText('Saved');
+  await startSignOut(page);
+  const dlg = page.getByRole('dialog', { name: "Some changes haven't synced yet." });
+  await expect(dlg).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/d/${id}$`));
+  await dlg.getByRole('button', { name: 'Sign out anyway' }).click();
+
+  await expect(page).toHaveURL(/localhost:3101\/$/);
+  await expect(page.locator('header.top').getByRole('link', { name: 'Sign in' })).toBeVisible();
+  await expect.poll(() => designDbs(page), { timeout: 10_000 }).toEqual([]);
+  expect(await page.evaluate(() => localStorage.getItem('kal-design-dbs'))).toBeNull();
+  // Signed out for good: a reload doesn't bring the session back.
+  await page.reload();
+  await expect(page.locator('header.top').getByRole('link', { name: 'Sign in' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('sign out when synced goes straight to /', async ({ page }) => {
+  const errors = watchErrors(page);
+  const user = await newUser();
+  await signIn(page, user);
+  const id = await newDesign(page);
+  await addHeading(page, 'All saved');
+  await expect(page.getByTestId('sync-state')).toHaveText('Saved', { timeout: 15_000 });
+  await startSignOut(page);
+  await expect(page).toHaveURL(/localhost:3101\/$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('header.top').getByRole('link', { name: 'Sign in' })).toBeVisible();
+  await expect.poll(() => designDbs(page), { timeout: 10_000 }).not.toContain(`kal-design-${id}`);
+  expect(errors).toEqual([]);
+});
+
+test('Wait while offline gives up after a while and offers Sign out anyway again', async ({ page, context }) => {
+  test.setTimeout(90_000);
+  const user = await newUser();
+  await signIn(page, user);
+  const id = await newDesign(page);
+  await expect(page.getByTestId('sync-state')).toHaveText('Saved');
+
+  await context.setOffline(true);
+  await addHeading(page, 'Still offline');
+  await startSignOut(page);
+  const dlg = page.getByRole('dialog', { name: "Some changes haven't synced yet." });
+  await dlg.getByRole('button', { name: 'Wait' }).click();
+  await expect(dlg).toContainText('Saving your changes…');
+  await expect(dlg.getByRole('button', { name: 'Sign out anyway' })).toHaveCount(0);
+  await expect(dlg).toContainText("We couldn't save your changes.", { timeout: 25_000 });
+  await expect(dlg.getByRole('button', { name: 'Sign out anyway' })).toBeVisible();
+  await dlg.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(dlg).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`/d/${id}$`));
+  await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
+  await context.setOffline(false);
+});
+
+test('Wait saves unsynced changes once back online, then signs out', async ({ page, context }) => {
+  test.setTimeout(90_000);
+  const user = await newUser();
+  await signIn(page, user);
+  const id = await newDesign(page);
+  await expect(page.getByTestId('sync-state')).toHaveText('Saved');
+
+  await context.setOffline(true);
+  await addHeading(page, 'Saved while waiting');
+  await expect(page.getByTestId('sync-state')).toHaveText('Offline, changes kept on this computer', { timeout: 15_000 });
+  await startSignOut(page);
+  const dlg = page.getByRole('dialog', { name: "Some changes haven't synced yet." });
+  await dlg.getByRole('button', { name: 'Wait' }).click();
+  await expect(dlg).toContainText('Saving your changes…');
+  await context.setOffline(false);
+  await expect(page).toHaveURL(/localhost:3101\/$/, { timeout: 30_000 });
+
+  // The edit reached the account: signing back in shows it.
+  await signIn(page, user);
+  await page.goto(`/d/${id}`);
+  await expect(page.locator('.ph .tx', { hasText: 'Saved while waiting' })).toBeVisible({ timeout: 15_000 });
 });

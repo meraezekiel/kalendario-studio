@@ -51,20 +51,61 @@ The integration tests create and delete throwaway users, so they run against a s
 
 ## 4. Auth settings (both projects)
 
-In **Authentication > Sign In / Providers** and **URL Configuration**:
+Do this in the real project and again in the test project.
 
-1. Keep **Confirm email** on. Shared designs only open for confirmed accounts.
-2. Site URL: `http://localhost:3100`.
-3. Redirect URLs: add `http://localhost:3100/auth/callback` (and the production URL's `/auth/callback` once deployed).
+1. Open **Authentication > Sign In / Providers > Email**.
+2. Keep **Confirm email** on. Shared designs only open for confirmed accounts.
+3. Never enable auto-confirm (turning **Confirm email** off does that), and never turn off **Secure email change** (email-change confirmation). Either one would let someone sign up with, or switch to, an address they don't own and claim the designs waiting to be shared with it.
+4. Open **Authentication > URL Configuration**.
+5. Set **Site URL** to `http://localhost:3100` (change it to the Vercel URL once deployed, step 7).
+6. Under **Redirect URLs**, add each of these:
+   - `http://localhost:3100/auth/callback` (the app on your computer)
+   - `http://localhost:3101/auth/callback` (the end-to-end tests; the test project only needs this one and the one above)
+   - `https://<your-vercel-url>/auth/callback` (once deployed, step 7)
+
+   Sign-up confirmation, password reset and Google sign-in all come back through `/auth/callback`. A link to any URL not on this list is refused.
 
 ## 5. Google sign-in (later)
 
-Create an OAuth client in Google Cloud Console with redirect `https://<ref>.supabase.co/auth/v1/callback`, then paste its client ID and secret into **Authentication > Providers > Google**.
+The app launches with email and password only. The "Continue with Google" button stays hidden until `NEXT_PUBLIC_GOOGLE_AUTH=1` is set. To turn it on later:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create (or pick) a project.
+2. Open **APIs & Services > OAuth consent screen**. Fill in the app name, a support email and the app's URL, then publish it.
+3. Open **APIs & Services > Credentials > Create credentials > OAuth client ID**, and choose **Web application**.
+4. Under **Authorized redirect URIs**, add `https://<project-ref>.supabase.co/auth/v1/callback` (the real project's ref, as in its Project URL).
+5. Create it, then copy the **Client ID** and **Client secret**. Keep the secret out of the repo.
+6. In Supabase, open **Authentication > Sign In / Providers > Google**. Turn it on and paste the Client ID and Client secret. Save.
+7. Check that `https://<your-vercel-url>/auth/callback` is in the redirect list (step 4).
+8. Set `NEXT_PUBLIC_GOOGLE_AUTH=1` in `.env.local` and in Vercel's environment variables, then redeploy. The button appears on the sign-in page.
 
 ## 6. Custom email sender (optional)
 
 Supabase's built-in mailer is rate-limited. For real use, add Resend (or any SMTP) under **Authentication > Emails > SMTP Settings**.
 
-## 7. Vercel (Task 11)
+## 7. Deploy to Vercel
 
-Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to the Vercel project's environment variables, and add the production `/auth/callback` URL to the redirect list.
+Next.js needs no `vercel.json`.
+
+1. Make sure the real project has every migration (step 2): run `npm run db:push` after `npx supabase link`, or, without linking, `npx supabase db push --db-url "<session pooler connection string>"` (from the real project's **Connect > Session pooler**).
+2. In [Vercel](https://vercel.com/new), import the GitHub repo. Keep the detected Next.js settings.
+3. Before deploying, open **Environment Variables** and add the real project's values:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+   Only these two (plus `NEXT_PUBLIC_GOOGLE_AUTH=1` once Google is set up). The service key and database password never go to Vercel.
+4. Deploy, and note the site's URL (for example `https://kalendario-studio.vercel.app`).
+5. In the real Supabase project, open **Authentication > URL Configuration**:
+   - Set **Site URL** to the Vercel URL.
+   - Add `<vercel-url>/auth/callback` to **Redirect URLs** (keep the localhost ones).
+6. Smoke test the live site from your computer:
+   ```
+   BASE_URL=<vercel-url> npm run e2e
+   ```
+   (In PowerShell: `$env:BASE_URL="<vercel-url>"; npm run e2e`.) This runs the editor tests against the deployed site. The cloud tests always use the test project on your computer.
+7. Sign up on the live site with your own email, confirm it, and open **My designs** to check everything works end to end.
+
+## 8. Keeping it running
+
+- The free Supabase plan pauses a project after about a week with no activity. The site then can't sign in or sync (the local editor still works). Restore it from the dashboard with **Restore project**; nothing is lost. Any regular use keeps it awake.
+- When a new file appears in `supabase/migrations`, push it to both projects (steps 2 and 3) before deploying the code that needs it.
+- Signing out deletes the account's offline design copies from that browser. If some changes haven't synced yet, the app asks first.

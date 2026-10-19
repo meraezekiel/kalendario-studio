@@ -18,6 +18,8 @@ interface PhotoUrlState {
    * a recent failure is waiting out RETRY_MS (unless `force`).
    */
   load(path: string, force?: boolean): Promise<string | null>;
+  /** Revokes every object URL and forgets everything (on sign-out); downloads still on their way are dropped. */
+  clear(): void;
 }
 
 /** Failed downloads retry by themselves this many times (a minute), then only when asked again. */
@@ -26,6 +28,8 @@ const AUTO_RETRIES = 6;
 const pending = new Map<string, Promise<string | null>>();
 /** Failures in a row, by path. */
 const tries = new Map<string, number>();
+/** Bumped by clear(): a download started before it is thrown away. */
+let epoch = 0;
 
 const without = (r: Record<string, number>, k: string) => {
   const { [k]: _, ...rest } = r;
@@ -43,15 +47,18 @@ export const usePhotoUrlStore = create<PhotoUrlState>((set, get) => ({
     if (busy) return busy;
     const at = s.failed[path];
     if (!force && at && Date.now() - at < RETRY_MS) return Promise.resolve(null);
+    const started = epoch;
     const p = photoBlob(path)
       .then(
         (blob) => {
+          if (started !== epoch) return null;
           tries.delete(path);
           const url = URL.createObjectURL(blob);
           set((st) => ({ urls: { ...st.urls, [path]: url }, failed: without(st.failed, path) }));
           return url;
         },
         () => {
+          if (started !== epoch) return null;
           const when = Date.now();
           const n = (tries.get(path) ?? 0) + 1;
           tries.set(path, n);
@@ -66,9 +73,19 @@ export const usePhotoUrlStore = create<PhotoUrlState>((set, get) => ({
           return null;
         },
       )
-      .finally(() => pending.delete(path));
+      .finally(() => {
+        if (pending.get(path) === p) pending.delete(path);
+      });
     pending.set(path, p);
     return p;
+  },
+
+  clear() {
+    epoch++;
+    for (const url of Object.values(get().urls)) URL.revokeObjectURL(url);
+    pending.clear();
+    tries.clear();
+    set({ urls: {}, failed: {} });
   },
 }));
 

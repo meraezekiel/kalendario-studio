@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 import type { AuthError, User } from '@supabase/supabase-js';
 import { safeNext } from '@/lib/cloud/safeNext';
+import { forgetLocalCopies } from '@/lib/cloud/localCopies';
 import { cloudEnabled, supabase } from '@/lib/cloud/supabase';
+import { saveAll, useCloudStore } from './useCloudStore';
+import { useMyTemplatesStore } from './useMyTemplatesStore';
+import { usePhotoUrlStore } from './usePhotoUrlStore';
 
 export type AuthUser = { id: string; email: string; name: string };
 
@@ -22,7 +26,31 @@ interface AuthState {
   signIn(email: string, password: string): Promise<void>;
   google(): Promise<void>;
   resetPassword(email: string): Promise<void>;
-  signOut(): Promise<void>;
+  /**
+   * Signs out, then deletes this account's data from the browser (offline design copies, downloaded
+   * photos, templates). With unsaved cloud edits (and no `force`) it asks first instead: `unsynced`
+   * becomes 'ask'. Resolves true once signed out (the caller then routes to `/`), false when it asked.
+   * Never rejects: offline, the session here is cleared anyway.
+   */
+  signOut(opts?: { force?: boolean }): Promise<boolean>;
+  /** The "Wait" answer: saves the pending edits (up to SAVE_WAIT_MS), then signs out. False when they still aren't saved ('stuck') or it was cancelled. */
+  waitThenSignOut(): Promise<boolean>;
+  /** Keeps editing: drops the question. */
+  cancelSignOut(): void;
+  /** The sign-out question about unsaved edits: asked, saving them, or saving timed out. */
+  unsynced: 'ask' | 'waiting' | 'stuck' | null;
+  /** True from signing out until the next sign-in: pages that need an account leave it to sign-out's routing. */
+  leaving: boolean;
+}
+
+/** How long "Wait" waits for the edits to be saved before offering "Sign out anyway" again. */
+export const SAVE_WAIT_MS = 15_000;
+
+/** Removes the signed-out account's data from this browser. The signed-out local design stays (it isn't account data). */
+async function forgetAccountData() {
+  usePhotoUrlStore.getState().clear();
+  useMyTemplatesStore.setState({ list: [], loaded: false, owner: null });
+  await forgetLocalCopies();
 }
 
 function toUser(u: User | null | undefined): AuthUser | null {
@@ -59,7 +87,7 @@ const callbackUrl = () => `${location.origin}/auth/callback`;
 
 let started = false;
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   ready: false,
 
@@ -71,7 +99,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       return;
     }
     // Fires INITIAL_SESSION straight away (from local storage; no network when signed out), then every change.
-    supabase().auth.onAuthStateChange((_event, session) => set({ user: toUser(session?.user), ready: true }));
+    supabase().auth.onAuthStateChange((_event, session) => {
+      const user = toUser(session?.user);
+      set(user ? { user, ready: true, leaving: false } : { user, ready: true });
+    });
   },
 
   async signUp(email, password, name) {
@@ -99,9 +130,39 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (error) throw friendly(error);
   },
 
-  async signOut() {
-    const { error } = await supabase().auth.signOut();
-    if (error) throw friendly(error);
+  unsynced: null,
+  leaving: false,
+
+  async signOut(opts) {
+    if (!opts?.force && useCloudStore.getState().status.pending) {
+      set({ unsynced: 'ask' });
+      return false;
+    }
+    set({ unsynced: null, leaving: true });
+    try {
+      const { error } = await supabase().auth.signOut();
+      // Offline (or the server is unreachable): forget the session in this browser anyway.
+      if (error) await supabase().auth.signOut({ scope: 'local' });
+    } catch {
+      await supabase().auth.signOut({ scope: 'local' }).catch(() => {});
+    }
     set({ user: null });
+    await forgetAccountData();
+    return true;
+  },
+
+  async waitThenSignOut() {
+    set({ unsynced: 'waiting' });
+    const saved = await saveAll(SAVE_WAIT_MS);
+    if (get().unsynced !== 'waiting') return false; // cancelled meanwhile
+    if (!saved) {
+      set({ unsynced: 'stuck' });
+      return false;
+    }
+    return get().signOut({ force: true });
+  },
+
+  cancelSignOut() {
+    set({ unsynced: null });
   },
 }));

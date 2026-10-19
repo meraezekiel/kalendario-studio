@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { colorFor } from '@/lib/cloud/presence';
 import { fillYear, setYear } from './actions';
-import { confirmReplaceAll, useCloudStore } from './useCloudStore';
+import { confirmReplaceAll, provideFlush, saveAll, useCloudStore } from './useCloudStore';
 import { freshDoc, useStudioStore } from './useStudioStore';
 
 const ana = { key: 't1', uid: 'u1', name: 'Ana', color: colorFor('u1'), page: 0, sel: [] };
@@ -67,5 +67,51 @@ describe('whole-design actions', () => {
     useCloudStore.getState().answerReplace(true);
     await again;
     expect(useStudioStore.getState().doc.year).toBe(2033);
+  });
+});
+
+describe('saveAll', () => {
+  const pending = (p: boolean) => useCloudStore.getState().patch({ status: { state: p ? 'offline' : 'live', pending: p } });
+  beforeEach(() => useCloudStore.getState().begin(null));
+  afterEach(() => vi.useRealTimers());
+
+  it('is true at once when nothing is pending', async () => {
+    expect(await saveAll(1000)).toBe(true);
+  });
+
+  it('flushes and is true once the edits are saved', async () => {
+    pending(true);
+    let flushed = 0;
+    const withdraw = provideFlush(async () => {
+      flushed++;
+      pending(false);
+    });
+    expect(await saveAll(5000)).toBe(true);
+    expect(flushed).toBe(1);
+    withdraw();
+  });
+
+  it('keeps trying, and is false when the edits are still pending after the time is up', async () => {
+    vi.useFakeTimers();
+    pending(true);
+    let flushed = 0;
+    const withdraw = provideFlush(async () => {
+      flushed++;
+    });
+    const result = saveAll(15_000);
+    await vi.advanceTimersByTimeAsync(15_100);
+    expect(await result).toBe(false);
+    expect(flushed).toBeGreaterThan(1);
+    withdraw();
+  });
+
+  it('is true when the edits get saved by themselves while waiting', async () => {
+    vi.useFakeTimers();
+    pending(true);
+    const result = saveAll(15_000);
+    await vi.advanceTimersByTimeAsync(2500);
+    pending(false);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(await result).toBe(true);
   });
 });

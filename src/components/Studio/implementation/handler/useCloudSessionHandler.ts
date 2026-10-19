@@ -4,13 +4,14 @@ import { toJpeg } from 'html-to-image';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import type { CalendarDoc } from '@/lib/calendar/types';
 import { getDesign, saveThumb } from '@/lib/cloud/designs';
+import { dbName, rememberLocalCopy } from '@/lib/cloud/localCopies';
 import { colorFor, type PresencePayload, readOthers } from '@/lib/cloud/presence';
 import { DesignSync, type SyncStatus } from '@/lib/cloud/sync';
 import { SupabaseTransport } from '@/lib/cloud/transport';
 import { makeUndoDriver } from '@/lib/cloud/undo';
 import type { SharedDoc } from '@/lib/cloud/ydoc';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useCloudStore } from '@/store/useCloudStore';
+import { provideFlush, useCloudStore } from '@/store/useCloudStore';
 import { freshDoc, selIds, useStudioStore } from '@/store/useStudioStore';
 
 const THUMB_EVERY_MS = 60_000;
@@ -100,7 +101,8 @@ export function useCloudSessionHandler(designId: string) {
   useEffect(() => {
     if (!authReady) return;
     if (!userId) {
-      router.replace(`/login?next=${encodeURIComponent(`/d/${designId}`)}`);
+      // Signing out from here routes to / itself.
+      if (!useAuthStore.getState().leaving) router.replace(`/login?next=${encodeURIComponent(`/d/${designId}`)}`);
       return;
     }
     useCloudStore.getState().begin(designId);
@@ -185,9 +187,13 @@ export function useCloudSessionHandler(designId: string) {
         return true;
       });
       const s = new DesignSync(designId, transport, {
-        persist: (y) => new IndexeddbPersistence(`kal-design-${designId}`, y),
+        persist: (y) => {
+          rememberLocalCopy(designId); // so sign-out can delete it where indexedDB.databases() is missing
+          return new IndexeddbPersistence(dbName(designId), y);
+        },
       });
       sync = s;
+      offs.push(provideFlush(() => s.flush()));
       offs.push(s.on('status', onStatus));
       offs.push(s.on('remote', show));
       started = s.start();

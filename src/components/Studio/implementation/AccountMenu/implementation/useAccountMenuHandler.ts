@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { photoUsage } from '@/lib/cloud/photos';
 import { cloudEnabled } from '@/lib/cloud/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useGoHome } from './SignOutConfirm/implementation/useSignOutConfirmHandler';
 
 /** Bytes as MB with one decimal; anything stored shows as at least 0.1. */
 const mb = (bytes: number) => (bytes > 0 ? Math.max(0.1, bytes / 1048576) : 0).toFixed(1);
 
 export function useAccountMenuHandler() {
-  const router = useRouter();
+  const goHome = useGoHome();
   const user = useAuthStore((s) => s.user);
   const ready = useAuthStore((s) => s.ready);
   const [open, setOpen] = useState(false);
@@ -49,13 +49,8 @@ export function useAccountMenuHandler() {
 
   const signOut = async () => {
     setOpen(false);
-    try {
-      await useAuthStore.getState().signOut();
-    } catch {
-      // Already signed out on the server (or offline); the local session is cleared either way.
-    }
-    // My designs and cloud designs need an account; signed out, the local editor is the place to be.
-    if (location.pathname !== '/') router.push('/');
+    // False when it asks about unsaved edits first (SignOutConfirm takes it from there).
+    if (await useAuthStore.getState().signOut()) goHome();
   };
 
   return {

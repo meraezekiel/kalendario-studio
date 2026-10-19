@@ -44,7 +44,8 @@ export function useDesignsHandler() {
   useEffect(() => {
     if (!authReady) return;
     if (!userId) {
-      router.replace(`/login?next=${encodeURIComponent('/designs')}`);
+      // Signing out from here routes to / itself.
+      if (!useAuthStore.getState().leaving) router.replace(`/login?next=${encodeURIComponent('/designs')}`);
       return;
     }
     void load();
