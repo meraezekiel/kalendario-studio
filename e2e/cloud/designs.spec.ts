@@ -88,6 +88,42 @@ test('new design opens in the editor and appears in My designs after going back'
   await ctx.close();
 });
 
+test('leaving a cloud design for the local editor leaves none of it there or in local storage', async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: ownerState });
+  const page = await ctx.newPage();
+  const errors = watchErrors(page);
+  await newDesign(page);
+  await addHeading(page, 'Cloud only');
+  await expect(syncState(page)).toHaveText('Saved');
+  // Client-side navigation all the way, so the store survives: editor -> My designs -> local editor.
+  await page.getByRole('link', { name: 'My designs' }).click();
+  await expect(page).toHaveURL(/\/designs$/);
+  await page.getByRole('link', { name: 'Kalendaryo Studio' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('.ph .page')).toBeVisible();
+  await expect(page.locator('.ph .tx', { hasText: 'Cloud only' })).toHaveCount(0);
+  await expect(page.getByTestId('sync-state')).toHaveCount(0);
+
+  await addHeading(page, 'Local edit');
+  await page.waitForTimeout(900); // local autosave is debounced by 400 ms
+  const saved = await page.evaluate(
+    () =>
+      new Promise<string>((resolve, reject) => {
+        const open = indexedDB.open('keyval-store');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const get = open.result.transaction('keyval', 'readonly').objectStore('keyval').get('kalendaryo-studio-v3');
+          get.onerror = () => reject(get.error);
+          get.onsuccess = () => resolve(JSON.stringify(get.result ?? null));
+        };
+      }),
+  );
+  expect(saved).toContain('Local edit');
+  expect(saved).not.toContain('Cloud only');
+  expect(errors).toEqual([]);
+  await ctx.close();
+});
+
 test('edit on one computer shows on another', async ({ browser }) => {
   const a = await browser.newContext({ storageState: ownerState });
   const b = await browser.newContext({ storageState: ownerState });

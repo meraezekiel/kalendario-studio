@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AuthError, User } from '@supabase/supabase-js';
+import { safeNext } from '@/lib/cloud/safeNext';
 import { cloudEnabled, supabase } from '@/lib/cloud/supabase';
 
 export type AuthUser = { id: string; email: string; name: string };
@@ -9,8 +10,7 @@ export const AFTER_SIGN_IN = '/designs';
 
 /** A same-site path from `?next=` (e.g. /d/<id> after a signed-out visit), or AFTER_SIGN_IN. */
 export function nextPath(search: string): string {
-  const next = new URLSearchParams(search).get('next');
-  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : AFTER_SIGN_IN;
+  return safeNext(new URLSearchParams(search).get('next'), location.origin, AFTER_SIGN_IN);
 }
 
 interface AuthState {

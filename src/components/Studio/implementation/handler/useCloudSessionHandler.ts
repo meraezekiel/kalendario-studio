@@ -9,7 +9,7 @@ import { SupabaseTransport } from '@/lib/cloud/transport';
 import type { SharedDoc } from '@/lib/cloud/ydoc';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCloudStore } from '@/store/useCloudStore';
-import { useStudioStore } from '@/store/useStudioStore';
+import { freshDoc, useStudioStore } from '@/store/useStudioStore';
 
 const THUMB_EVERY_MS = 60_000;
 const THUMB_W = 320;
@@ -120,7 +120,10 @@ export function useCloudSessionHandler(designId: string) {
     return () => {
       cancelled = true;
       offs.forEach((off) => off());
-      useStudioStore.setState({ onLocalChange: null, readOnly: false, ready: false });
+      // Leave nothing of this design in the store (history and selection included) for the next screen.
+      useStudioStore.setState({ onLocalChange: null, readOnly: false, historyDriver: null });
+      useStudioStore.getState().hydrate(freshDoc());
+      useStudioStore.setState({ ready: false });
       useCloudStore.getState().begin(null);
       const s = sync;
       if (s) void started.catch(() => {}).then(() => s.stop());

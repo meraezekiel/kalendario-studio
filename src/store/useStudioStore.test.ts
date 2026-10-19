@@ -46,6 +46,27 @@ describe('studio store cloud hooks', () => {
     }
   });
 
+  it('readOnly also blocks checkpoint, undo and redo (nothing reaches onLocalChange)', () => {
+    S().mutate((d) => void (d.year = 2045)); // an undo step from before the design became view only
+    useStudioStore.setState({ future: [structuredClone(S().doc)] });
+    const onLocal = vi.fn();
+    const driver = { undo: vi.fn(), redo: vi.fn(), stop: vi.fn() };
+    useStudioStore.setState({ readOnly: true, onLocalChange: onLocal });
+    const before = S().doc;
+    const past = S().past.length;
+    S().checkpoint();
+    expect(S().past).toHaveLength(past);
+    S().undo();
+    S().redo();
+    expect(S().doc).toBe(before);
+    useStudioStore.setState({ historyDriver: driver });
+    S().undo();
+    S().redo();
+    expect(driver.undo).not.toHaveBeenCalled();
+    expect(driver.redo).not.toHaveBeenCalled();
+    expect(onLocal).not.toHaveBeenCalled();
+  });
+
   it('historyDriver takes over undo/redo and mutate records no local history', () => {
     const driver = { undo: vi.fn(), redo: vi.fn(), stop: vi.fn() };
     useStudioStore.setState({ historyDriver: driver });

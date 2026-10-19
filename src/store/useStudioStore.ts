@@ -134,6 +134,7 @@ export const useStudioStore = create<StudioState>()(
 
     checkpoint: () =>
       set((st) => {
+        if (get().readOnly) return; // a viewer's drag must not create an undo step
         if (!get().historyDriver) {
           st.past.push(get().doc);
           if (st.past.length > HISTORY_LIMIT) st.past.shift();
@@ -144,6 +145,7 @@ export const useStudioStore = create<StudioState>()(
 
     undo: () => {
       const s = get();
+      if (s.readOnly) return; // undo would write to a view-only design
       if (s.historyDriver) return s.historyDriver.undo();
       if (!s.past.length) return s.showToast('Nothing to undo.');
       const prev = s.past[s.past.length - 1];
@@ -159,6 +161,7 @@ export const useStudioStore = create<StudioState>()(
 
     redo: () => {
       const s = get();
+      if (s.readOnly) return;
       if (s.historyDriver) return s.historyDriver.redo();
       if (!s.future.length) return;
       const next = s.future[s.future.length - 1];

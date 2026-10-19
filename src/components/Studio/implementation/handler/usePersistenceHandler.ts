@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { get, set } from 'idb-keyval';
 import { isDoc } from '@/lib/calendar/designFile';
 import { migrateDoc } from '@/lib/calendar/document';
-import { STORAGE_KEY, toast, useStudioStore } from '@/store/useStudioStore';
+import { freshDoc, STORAGE_KEY, toast, useStudioStore } from '@/store/useStudioStore';
 
 /** Loads the saved calendar from IndexedDB on start, then autosaves every change (debounced). */
 export function usePersistenceHandler() {
@@ -22,7 +22,8 @@ export function usePersistenceHandler() {
       .then((saved) => {
         if (cancelled) return;
         const st = useStudioStore.getState();
-        st.hydrate(isDoc(saved) ? migrateDoc({ ...saved, cur: Math.min(saved.cur, saved.pages.length - 1) }) : null);
+        // Always a doc: whatever the store holds may be a cloud design left by another screen.
+        st.hydrate(isDoc(saved) ? migrateDoc({ ...saved, cur: Math.min(saved.cur, saved.pages.length - 1) }) : freshDoc());
         unsub = useStudioStore.subscribe((s, prev) => {
           if (s.doc === prev.doc) return;
           clearTimeout(timer);
