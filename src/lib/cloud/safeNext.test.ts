@@ -23,4 +23,16 @@ describe('safeNext', () => {
     expect(go('https://evil.com')).toBe('/designs');
     expect(go('javascript:alert(1)')).toBe('/designs');
   });
+
+  it('rejects paths that normalise to protocol-relative ones', () => {
+    expect(go('/.//evil.com')).toBe('/designs');
+    expect(go('/a/..//evil.com')).toBe('/designs');
+    expect(go('/%2e//evil.com')).toBe('/designs');
+    // Literal query strings decoded the way the app does (nextPath uses URLSearchParams).
+    const fromQuery = (q: string) => go(new URLSearchParams(q).get('next'));
+    expect(fromQuery('?next=/%09/evil.com')).toBe('/designs');
+    expect(fromQuery('?next=/.//evil.com')).toBe('/designs');
+    expect(fromQuery('?next=/%2e//evil.com')).toBe('/designs');
+    expect(fromQuery('?next=%2Fd%2Fabc')).toBe('/d/abc');
+  });
 });

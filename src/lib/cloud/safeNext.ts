@@ -7,7 +7,10 @@ export function safeNext(next: string | null | undefined, origin: string, fallba
   if (!next) return fallback;
   try {
     const u = new URL(next, origin);
-    return u.origin === origin ? u.pathname + u.search + u.hash : fallback;
+    if (u.origin !== origin) return fallback;
+    // Dot segments can normalise to a protocol-relative path (`/.//evil.com` -> `//evil.com`).
+    const r = u.pathname + u.search + u.hash;
+    return r.startsWith('/') && !r.startsWith('//') && !r.startsWith('/\\') ? r : fallback;
   } catch {
     return fallback;
   }
