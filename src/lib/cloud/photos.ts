@@ -8,6 +8,8 @@ const PREFIX = 'sb:';
 /** Cloud photos are stored smaller than local ones: they count against the account's 50 MB. */
 const CLOUD_MAX_PX = 1600;
 const CLOUD_QUALITY = 0.82;
+/** Per-photo limit (the bucket's and the photos table's). */
+const MAX_PHOTO_BYTES = 5242880;
 
 /** True for a photo kept in cloud storage (`sb:<path>`), as opposed to a data, blob or sample source. */
 export const isCloudSrc = (src: string | null | undefined): src is string => !!src && src.startsWith(PREFIX);
@@ -25,6 +27,25 @@ export function photosOf(doc: CalendarDoc): string[] {
   return [...out];
 }
 
+/**
+ * Whether removing asset `assetId` may also delete its stored photo: only a photo of this design
+ * (`<designId>/…`; templates can bring in other designs' photos) that no other asset here shares.
+ */
+export function canDeleteCloudPhoto(doc: CalendarDoc, assetId: string, designId: string): boolean {
+  const src = doc.assets[assetId]?.src;
+  const p = cloudPath(src);
+  if (!p || !p.startsWith(`${designId}/`)) return false;
+  return !Object.entries(doc.assets).some(([id, a]) => id !== assetId && a.src === src);
+}
+
+/** One photo is over the 5 MB per-photo limit (even after downscaling). */
+export class PhotoTooLarge extends Error {
+  constructor(message = 'photo too large') {
+    super(message);
+    this.name = 'PhotoTooLarge';
+  }
+}
+
 /** The picked file isn't an image the browser can read. */
 export class UnreadableImage extends Error {
   constructor(name: string) {
@@ -36,16 +57,16 @@ export class UnreadableImage extends Error {
 type ErrLike = { message?: unknown; status?: unknown; statusCode?: unknown; originalError?: unknown };
 
 /**
- * Classifies a photos-row or storage failure. Over the quota or the per-photo size is 'limit': the
- * row insert says so by name, the upload only as a database error from the quota re-check (or 413).
+ * Classifies a photos-row or storage failure. Over the per-photo size is PhotoTooLarge (row insert:
+ * 'photo too large'; storage: 413). Over the quota is CloudError 'limit': the row insert says so by
+ * name, the upload only as a database error from the quota re-check.
  */
 export function photoError(e: unknown): Error {
-  if (e instanceof CloudError) return e;
+  if (e instanceof CloudError || e instanceof PhotoTooLarge) return e;
   const err = (e && typeof e === 'object' ? e : {}) as ErrLike;
   const message = typeof err.message === 'string' ? err.message : String(e);
-  if (/limit reached|photo too large|maximum allowed size|database error, code: P0001/i.test(message) || err.status === 413 || err.statusCode === '413') {
-    return new CloudError('limit', message);
-  }
+  if (/photo too large|maximum allowed size/i.test(message) || err.status === 413 || err.statusCode === '413') return new PhotoTooLarge(message);
+  if (/limit reached|database error, code: P0001/i.test(message)) return new CloudError('limit', message);
   // storage-js wraps a failed fetch in its own error.
   if (err.originalError instanceof TypeError || /^(Failed to fetch|NetworkError|Load failed)/.test(message)) return new CloudError('offline', message);
   return toCloudError(e);
@@ -88,17 +109,20 @@ const downloading = new Map<string, Promise<Blob>>();
 /**
  * Stores a picked photo for design `designId` and returns its asset (`sb:<path>`). The photos row goes
  * first (storage only takes files that have one), then the file; a failed upload takes its row back.
- * Throws UnreadableImage, or CloudError 'limit' (50 MB per account, 5 MB per photo) / 'offline' / 'denied'.
+ * Throws UnreadableImage, PhotoTooLarge (over 5 MB, checked before anything is sent), or CloudError
+ * 'limit' (50 MB per account) / 'offline' / 'denied'.
  */
 export async function uploadPhoto(designId: string, file: File): Promise<Asset> {
   let a: Asset;
   try {
-    a = await readImage(file, CLOUD_MAX_PX, CLOUD_QUALITY);
+    // Only images with real transparency stay PNG; opaque ones become JPEG.
+    a = await readImage(file, CLOUD_MAX_PX, CLOUD_QUALITY, true);
   } catch {
     throw new UnreadableImage(file.name);
   }
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new CloudError('offline', 'offline');
   const blob = toBlob(a.src);
+  if (blob.size > MAX_PHOTO_BYTES) throw new PhotoTooLarge();
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new CloudError('offline', 'offline');
   const path = `${designId}/${crypto.randomUUID()}.${blob.type === 'image/png' ? 'png' : 'jpg'}`;
   const sb = supabase();
   await run(sb.from('photos').insert({ path, design_id: designId, bytes: blob.size }));

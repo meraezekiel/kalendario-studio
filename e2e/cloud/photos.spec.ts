@@ -90,7 +90,9 @@ test('photo uploaded on A appears on B', async ({ browser }) => {
 
   const upload = pa.waitForResponse((r) => r.url().includes('/storage/v1/object/photos/') && r.request().method() === 'POST');
   await uploadToTray(pa, { name: 'a.png', mimeType: 'image/png', buffer: await makePng(pa) });
-  expect((await upload).ok()).toBe(true);
+  const res = await upload;
+  expect(res.ok()).toBe(true);
+  expect(res.url()).toMatch(/\.jpg$/); // an opaque PNG is stored as JPEG
   await pa.getByTestId('tray').locator('.t').first().getByRole('button', { name: 'Add to page' }).click();
   await expect(cloudPhotos(pa)).toHaveCount(1);
   await expect(syncState(pa)).toHaveText('Saved');
@@ -183,6 +185,36 @@ test('usage shows in the account menu after upload', async ({ browser }) => {
   await page.getByTestId('tray').locator('.t').first().getByRole('button', { name: 'Remove photo' }).click();
   expect((await freed).ok()).toBe(true);
   expect(mb(await usageText(page))).toBeLessThan(after);
+  expect(errors).toEqual([]);
+  await ctx.close();
+});
+
+test('a see-through photo still over 5 MB once shrunk says it is too big and sends nothing', async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: ownerState });
+  const page = await ctx.newPage();
+  const errors = watchErrors(page);
+  await newDesign(page);
+  // Semi-transparent noise: it stays PNG and doesn't compress (about 10 MB at 1600×1600).
+  const b64 = await page.evaluate(() => {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 1600;
+    const g = cv.getContext('2d')!;
+    const img = g.createImageData(1600, 1600);
+    for (let i = 0; i < img.data.length; i++) img.data[i] = i % 4 === 3 ? 128 + Math.floor(Math.random() * 120) : Math.floor(Math.random() * 256);
+    g.putImageData(img, 0, 0);
+    return cv.toDataURL('image/png').split(',')[1];
+  });
+  let sent = 0;
+  page.on('request', (r) => {
+    if (/\/rest\/v1\/photos|\/storage\/v1\/object\//.test(r.url()) && r.method() !== 'GET') sent++;
+  });
+  await page.getByRole('button', { name: 'Photos', exact: true }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Upload photos' }).click();
+  await (await chooser).setFiles([{ name: 'huge.png', mimeType: 'image/png', buffer: Buffer.from(b64, 'base64') }]);
+  await expect(page.locator('.toast')).toHaveText('That photo is too big to add (over 5 MB). Try a smaller one.', { timeout: 20_000 });
+  await expect(page.getByTestId('tray')).toHaveCount(0);
+  expect(sent).toBe(0);
   expect(errors).toEqual([]);
   await ctx.close();
 });

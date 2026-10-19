@@ -70,8 +70,18 @@ export function samplePhoto(m: number): Asset {
   return (cache[m] = { src: c.toDataURL('image/jpeg', 0.85), w: 1200, h: 800 });
 }
 
-/** Downscales an uploaded image to at most `max` px and returns it as a data URL asset (PNG when it may be transparent). */
-export function readImage(file: File, max = 2000, quality = 0.9): Promise<Asset> {
+/** True when any pixel of RGBA `data` (canvas ImageData) is not fully opaque. */
+export function hasTransparency(data: Uint8ClampedArray): boolean {
+  for (let i = 3; i < data.length; i += 4) if (data[i] < 255) return true;
+  return false;
+}
+
+/**
+ * Downscales an uploaded image to at most `max` px and returns it as a data URL asset: PNG when the
+ * file type may be transparent, else JPEG. With `jpegIfOpaque`, a PNG/WebP/GIF whose pixels turn out
+ * all opaque is stored as JPEG too (much smaller).
+ */
+export function readImage(file: File, max = 2000, quality = 0.9, jpegIfOpaque = false): Promise<Asset> {
   return new Promise((res, rej) => {
     const r = new FileReader();
     r.onload = () => {
@@ -81,8 +91,10 @@ export function readImage(file: File, max = 2000, quality = 0.9): Promise<Asset>
         const c = document.createElement('canvas');
         c.width = Math.round(im.width * k);
         c.height = Math.round(im.height * k);
-        c.getContext('2d')!.drawImage(im, 0, 0, c.width, c.height);
-        const alpha = /png|webp|gif/.test(file.type);
+        const g = c.getContext('2d')!;
+        g.drawImage(im, 0, 0, c.width, c.height);
+        let alpha = /png|webp|gif/.test(file.type);
+        if (alpha && jpegIfOpaque) alpha = hasTransparency(g.getImageData(0, 0, c.width, c.height).data);
         res({ src: c.toDataURL(alpha ? 'image/png' : 'image/jpeg', quality), w: c.width, h: c.height });
       };
       im.onerror = rej;

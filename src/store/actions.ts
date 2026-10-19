@@ -13,7 +13,7 @@ import { giveCal, TEMPLATES } from '@/lib/calendar/templates';
 import { markThanksSeen, thanksSeen } from '@/lib/support/support';
 import type { CalEl, El, Page, ShapeEl, ShapeKind, SheetSettings } from '@/lib/calendar/types';
 import { clamp, clone, uid } from '@/lib/calendar/utils';
-import { cloudPath, deletePhoto, embedPhotos, photosOf, UnreadableImage, uploadPhoto } from '@/lib/cloud/photos';
+import { canDeleteCloudPhoto, cloudPath, deletePhoto, embedPhotos, photosOf, PhotoTooLarge, UnreadableImage, uploadPhoto } from '@/lib/cloud/photos';
 import { CloudError } from '@/lib/cloud/transport';
 import { useCloudStore } from './useCloudStore';
 import { curPage, findEl, type PickTarget, selIds, toast, useStudioStore } from './useStudioStore';
@@ -124,7 +124,8 @@ export function addGraphic(key: string, pt?: { x: number; y: number }) {
 /* ---------- photos ---------- */
 
 const PHOTO_SPACE_FULL = 'Your 50 MB photo space is full. Remove photos from your designs to add more.';
-const PHOTO_OFFLINE = "You're offline. Photos can be added once you're back online.";
+const PHOTO_TOO_BIG = 'That photo is too big to add (over 5 MB). Try a smaller one.';
+const PHOTO_OFFLINE ="You're offline. Photos can be added once you're back online.";
 
 /**
  * Reads picked images into the doc's assets and tray, returning their ids. In a cloud design each is
@@ -144,6 +145,7 @@ export async function addFiles(files: File[]): Promise<string[]> {
       read.push({ id: 'a' + uid(), a: designId ? await uploadPhoto(designId, f) : await readImage(f) });
     } catch (e) {
       if (!designId || e instanceof UnreadableImage) toast(`Couldn't read ${f.name}. Try a JPG or PNG.`);
+      else if (e instanceof PhotoTooLarge) toast(PHOTO_TOO_BIG);
       else if (e instanceof CloudError && (e.code === 'limit' || e.code === 'offline')) {
         toast(e.code === 'limit' ? PHOTO_SPACE_FULL : PHOTO_OFFLINE);
         break; // the rest would fail the same way
@@ -246,20 +248,24 @@ export function pickMonthBackgrounds() {
   inp.click();
 }
 
-/** Removes a photo from the tray; one no element uses is deleted (in a cloud design, its stored file too). */
+/**
+ * Removes a photo from the tray; one no element uses is deleted. In a cloud design its stored file
+ * goes too, when it is this design's own and no other asset shares it.
+ */
 export function removeTrayItem(i: number) {
   S().set({ armed: null });
+  const designId = useCloudStore.getState().designId;
   let freed: string | null = null;
   S().mutate((d) => {
     const id = d.tray[i];
     d.tray.splice(i, 1);
     if (!assetInUse(d, id)) {
-      freed = cloudPath(d.assets[id]?.src);
+      if (designId && canDeleteCloudPhoto(d, id, designId)) freed = cloudPath(d.assets[id].src);
       delete d.assets[id];
     }
   }, { history: false });
   const path = freed as string | null;
-  if (path && useCloudStore.getState().designId) {
+  if (path) {
     deletePhoto(path).catch(() => toast("The photo is removed, but its space couldn't be freed right now."));
   }
 }
