@@ -218,13 +218,21 @@ export async function photoUsage(): Promise<number> {
   return Number(await run(supabase().rpc('photo_usage')));
 }
 
-/** A copy of `doc` with every cloud photo turned back into a data URL (for files that leave the cloud). */
-export async function embedPhotos(doc: CalendarDoc): Promise<CalendarDoc> {
+/**
+ * A copy of `doc` with every cloud photo turned back into a data URL (for files that leave the cloud).
+ * With `keepUnreadable`, a photo that can't be fetched keeps its cloud source instead of failing it all.
+ */
+export async function embedPhotos(doc: CalendarDoc, keepUnreadable = false): Promise<CalendarDoc> {
   const assets = { ...doc.assets };
   await Promise.all(
     Object.entries(doc.assets).map(async ([id, a]) => {
       const p = cloudPath(a.src);
-      if (p) assets[id] = { ...a, src: await toDataUrl(await photoBlob(p)) };
+      if (!p) return;
+      try {
+        assets[id] = { ...a, src: await toDataUrl(await photoBlob(p)) };
+      } catch (e) {
+        if (!keepUnreadable) throw e;
+      }
     }),
   );
   return { ...doc, assets };

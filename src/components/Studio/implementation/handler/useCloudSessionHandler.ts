@@ -4,7 +4,7 @@ import { toJpeg } from 'html-to-image';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import type { CalendarDoc } from '@/lib/calendar/types';
 import { getDesign, saveThumb } from '@/lib/cloud/designs';
-import { DesignSync } from '@/lib/cloud/sync';
+import { DesignSync, type SyncStatus } from '@/lib/cloud/sync';
 import { SupabaseTransport } from '@/lib/cloud/transport';
 import type { SharedDoc } from '@/lib/cloud/ydoc';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -61,13 +61,47 @@ export function useCloudSessionHandler(designId: string) {
       return;
     }
     useCloudStore.getState().begin(designId);
-    useStudioStore.setState({ ready: false, readOnly: false, onLocalChange: null });
+    // Read-only until this person's role is known (it may not be yet when opened offline).
+    useStudioStore.setState({ ready: false, readOnly: true, onLocalChange: null });
     dirty.current = false;
     canWrite.current = false;
     let cancelled = false;
     let sync: DesignSync | null = null;
     let started: Promise<unknown> = Promise.resolve();
     const offs: (() => void)[] = [];
+
+    /** This person's role is known: owners and editors may edit (unless access went meanwhile). */
+    const learned = (info: NonNullable<Awaited<ReturnType<typeof getDesign>>>) => {
+      const cloud = useCloudStore.getState();
+      cloud.patch({ name: info.name, role: info.role });
+      thumb.current = info.thumb;
+      if (cloud.status.state === 'denied') return;
+      canWrite.current = info.role === 'owner' || info.role === 'editor';
+      useStudioStore.setState({ readOnly: !canWrite.current });
+    };
+    let asking = false;
+    /** Asks for the role again once back online, when the first try failed. */
+    const retryRole = async () => {
+      if (asking || useCloudStore.getState().role) return;
+      asking = true;
+      try {
+        const info = await getDesign(designId);
+        if (!cancelled && info) learned(info);
+      } catch {
+        // still unreachable: the next 'live' tries again
+      } finally {
+        asking = false;
+      }
+    };
+    const onStatus = (status: SyncStatus) => {
+      useCloudStore.getState().patch({ status });
+      if (status.state === 'denied') {
+        // Access went (or never was): nothing more can be saved, so stop editing.
+        canWrite.current = false;
+        useStudioStore.getState().select(null);
+        useStudioStore.setState({ readOnly: true });
+      } else if (status.state === 'live') void retryRole();
+    };
 
     /** Shows a version of the design: the first one starts the editor, later ones merge into it. */
     const show = (shared: SharedDoc) => {
@@ -84,28 +118,22 @@ export function useCloudSessionHandler(designId: string) {
         info = undefined; // offline or a hiccup: open from the offline copy; the engine reports the status
       }
       if (cancelled) return;
-      const cloud = useCloudStore.getState();
       if (info === null) {
-        cloud.patch({ status: { state: 'denied', pending: false } });
+        useCloudStore.getState().patch({ status: { state: 'denied', pending: false } });
         return;
       }
-      if (info) {
-        cloud.patch({ name: info.name, role: info.role });
-        thumb.current = info.thumb;
-      }
-      canWrite.current = info?.role === 'owner' || info?.role === 'editor';
-      useStudioStore.setState({ readOnly: info?.role === 'viewer' });
+      if (info) learned(info);
 
       const s = new DesignSync(designId, new SupabaseTransport(designId, userId), {
         persist: (y) => new IndexeddbPersistence(`kal-design-${designId}`, y),
       });
       sync = s;
-      offs.push(s.on('status', (status) => useCloudStore.getState().patch({ status })));
+      offs.push(s.on('status', onStatus));
       offs.push(s.on('remote', show));
       started = s.start();
       const doc = (await started) as SharedDoc | null;
       if (cancelled) return;
-      useCloudStore.getState().patch({ status: s.status });
+      onStatus(s.status);
       // Edits go into the Y.Doc; remote changes come back through applyRemote, which never calls this.
       useStudioStore.setState({
         onLocalChange: (prev, next, tracked) => {

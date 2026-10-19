@@ -9,15 +9,18 @@ import TemplatesPanel from './TemplatesPanel/implementation/TemplatesPanel';
 import { useDrawerHandler } from './useDrawerHandler';
 
 export default function Drawer() {
-  const { tab } = useDrawerHandler();
+  const { tab, readOnly } = useDrawerHandler();
   return (
     <aside className="drawer" aria-label={`${tab} panel`}>
-      {tab === 'templates' && <TemplatesPanel />}
-      {tab === 'add' && <AddPanel />}
-      {tab === 'graphics' && <GraphicsPanel />}
-      {tab === 'photos' && <PhotosPanel />}
-      {tab === 'page' && <PagesPanel />}
-      {tab === 'support' && <SupportPanel />}
+      {/* A view-only design: nothing here may add to it (the Pages tab disables its own editing parts). */}
+      <fieldset className="edit-lock" disabled={readOnly && tab !== 'page' && tab !== 'support'}>
+        {tab === 'templates' && <TemplatesPanel />}
+        {tab === 'add' && <AddPanel />}
+        {tab === 'graphics' && <GraphicsPanel />}
+        {tab === 'photos' && <PhotosPanel />}
+        {tab === 'page' && <PagesPanel />}
+        {tab === 'support' && <SupportPanel />}
+      </fieldset>
     </aside>
   );
 }

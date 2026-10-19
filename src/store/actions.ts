@@ -15,6 +15,7 @@ import type { CalEl, El, Page, ShapeEl, ShapeKind, SheetSettings } from '@/lib/c
 import { clamp, clone, uid } from '@/lib/calendar/utils';
 import { canDeleteCloudPhoto, cloudPath, deletePhoto, embedPhotos, photosOf, PhotoTooLarge, UnreadableImage, uploadPhoto } from '@/lib/cloud/photos';
 import { importDoc } from '@/lib/cloud/importDoc';
+import { copyDesign } from '@/lib/cloud/members';
 import { CloudError } from '@/lib/cloud/transport';
 import { useAuthStore } from './useAuthStore';
 import { useCloudStore } from './useCloudStore';
@@ -621,6 +622,27 @@ async function importFile(doc: ReturnType<typeof parseDesign>, fileName: string)
     navigate(`/d/${id}`);
   } catch (e) {
     toast(importMessage(e));
+  }
+}
+
+let copying = false;
+/**
+ * Saves what's open of the cloud design (as this tab has it, so it works after access is gone) as a
+ * new design in My designs and goes to it. Photos that can't be read any more become empty frames.
+ */
+export async function saveCopy() {
+  if (copying) return;
+  copying = true;
+  toast('Saving a copy…');
+  let skipped = 0;
+  try {
+    const id = await copyDesign(S().doc, useCloudStore.getState().name, (n) => (skipped = n));
+    toast(skipped ? skippedPhotosNote(skipped) : 'Saved a copy to My designs.');
+    navigate(`/d/${id}`);
+  } catch (e) {
+    toast(importMessage(e));
+  } finally {
+    copying = false;
   }
 }
 

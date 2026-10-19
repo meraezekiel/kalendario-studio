@@ -89,3 +89,26 @@ export async function newDesign(page: Page): Promise<string> {
   await expect(page.locator('.ph .page')).toBeVisible();
   return page.url().split('/d/')[1];
 }
+
+/** A user with `email` that has not confirmed it yet (so it can't sign in); removed by `cleanupUsers()`. */
+export async function newUnconfirmedUser(email: string): Promise<TestUser> {
+  const password = `pw-${randomUUID()}`;
+  const { data, error } = await admin().auth.admin.createUser({ email, password, email_confirm: false });
+  if (error) throw error;
+  const user = { id: data.user.id, email, password };
+  made.push(user);
+  return user;
+}
+
+/** Confirms a user's email, as following the confirmation link would. */
+export async function confirmUser(id: string) {
+  const { error } = await admin().auth.admin.updateUserById(id, { email_confirm: true });
+  if (error) throw error;
+}
+
+/** The user ids linked to the invitations of design `designId`, by email. */
+export async function memberLinks(designId: string): Promise<Record<string, string | null>> {
+  const { data, error } = await admin().from('design_members').select('email, user_id').eq('design_id', designId);
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).map((m) => [m.email as string, (m.user_id as string | null) ?? null]));
+}

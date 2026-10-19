@@ -10,5 +10,6 @@ export function useInspectorHandler() {
     if (s.multi.length) return `${s.multi.length} elements`;
     return el ? elName(el, s.doc.year, curPage(s.doc)) : `Page ${s.doc.cur + 1}`;
   });
-  return { el, selDay, cur, title, multi: count > 0 };
+  const readOnly = useStudioStore((s) => s.readOnly);
+  return { el, selDay, cur, title, multi: count > 0, readOnly };
 }

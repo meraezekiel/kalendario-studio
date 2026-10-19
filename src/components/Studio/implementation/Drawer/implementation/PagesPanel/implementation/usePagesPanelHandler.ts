@@ -11,9 +11,11 @@ export function usePagesPanelHandler() {
   const year = useStudioStore((s) => s.doc.year);
   const showHolidays = useStudioStore((s) => s.doc.holidays);
   const mutate = useStudioStore((s) => s.mutate);
+  const readOnly = useStudioStore((s) => s.readOnly);
 
   return {
     page,
+    readOnly,
     /** Square papers have no orientation to choose. */
     square: page.paper.size !== 'Custom' && PAPERS[page.paper.size][1] === PAPERS[page.paper.size][2],
     year,

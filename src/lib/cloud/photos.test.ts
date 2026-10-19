@@ -1,9 +1,37 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TEMPLATES } from '../calendar/templates';
 import type { CalendarDoc } from '../calendar/types';
 import { hasTransparency } from '../calendar/samplePhoto';
-import { canDeleteCloudPhoto, cloudPath, isCloudSrc, photoError, photosOf, PhotoTooLarge } from './photos';
+import { canDeleteCloudPhoto, cloudPath, embedPhotos, isCloudSrc, photoError, photosOf, PhotoTooLarge } from './photos';
 import { CloudError } from './transport';
+
+// Storage that has one photo ('d1/ok.jpg') and refuses every other.
+vi.mock('./supabase', () => ({
+  supabase: () => ({
+    storage: {
+      from: () => ({
+        download: async (path: string) =>
+          path === 'd1/ok.jpg'
+            ? { data: new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' }), error: null }
+            : { data: null, error: { message: 'new row violates row-level security policy' } },
+      }),
+    },
+  }),
+}));
+// Node has no FileReader; this one reads a blob as a data URL.
+class NodeFileReader {
+  result: string | null = null;
+  error: unknown = null;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  readAsDataURL(b: Blob) {
+    void b.arrayBuffer().then((buf) => {
+      this.result = `data:${b.type};base64,${Buffer.from(buf).toString('base64')}`;
+      this.onload?.();
+    });
+  }
+}
+vi.stubGlobal('FileReader', NodeFileReader);
 
 const mkDoc = (assets: CalendarDoc['assets']): CalendarDoc => ({ v: 3, year: 2027, holidays: true, cur: 0, assets, tray: Object.keys(assets), pages: TEMPLATES.pastel.make() });
 
@@ -105,5 +133,25 @@ describe('photoError', () => {
 
   it('maps row-level security to denied', () => {
     expect(code({ code: '42501', message: 'new row violates row-level security policy' })).toBe('denied');
+  });
+});
+
+describe('embedPhotos', () => {
+  const doc = () =>
+    mkDoc({
+      ok: { src: 'sb:d1/ok.jpg', w: 1, h: 1 },
+      gone: { src: 'sb:d1/gone.jpg', w: 1, h: 1 },
+      local: { src: 'data:image/png;base64,AAAA', w: 1, h: 1 },
+    });
+
+  it('fails when a photo cannot be read', async () => {
+    await expect(embedPhotos(doc())).rejects.toBeInstanceOf(CloudError);
+  });
+
+  it('with keepUnreadable, embeds what it can and leaves the rest as cloud sources', async () => {
+    const out = await embedPhotos(doc(), true);
+    expect(out.assets.ok.src).toBe('data:image/jpeg;base64,/9j/');
+    expect(out.assets.gone.src).toBe('sb:d1/gone.jpg');
+    expect(out.assets.local.src).toBe('data:image/png;base64,AAAA');
   });
 });

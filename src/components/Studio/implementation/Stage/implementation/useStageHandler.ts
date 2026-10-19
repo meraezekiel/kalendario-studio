@@ -11,6 +11,7 @@ export function useStageHandler() {
   const phRef = useRef<HTMLDivElement>(null);
   const page = useStudioStore((s) => curPage(s.doc));
   const armed = useStudioStore((s) => s.armed);
+  const readOnly = useStudioStore((s) => s.readOnly);
   const H = dims(page).H;
   const scale = useFitHandler(wrapRef, H);
   const pointer = usePointerHandler(wrapRef, phRef, scale);
@@ -20,6 +21,7 @@ export function useStageHandler() {
     wrapRef,
     phRef,
     page,
+    readOnly,
     armed,
     scale,
     scalerStyle: { width: DW * scale, height: H * scale },

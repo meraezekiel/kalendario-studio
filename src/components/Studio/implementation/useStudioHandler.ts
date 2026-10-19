@@ -22,5 +22,6 @@ export function useStudioHandler(designId?: string) {
   // In cloud mode the store must hold this design, not whatever the previous screen left in it.
   const ready = storeReady && (!designId || session === designId);
   // Losing access while editing keeps the editor open (the top bar says so); before that, it's a dead end.
-  return { ready, denied: denied && !ready };
+  const readOnly = useStudioStore((s) => s.readOnly);
+  return { ready, denied: denied && !ready, readOnly };
 }

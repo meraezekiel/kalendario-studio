@@ -1,7 +1,7 @@
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { MONTHS } from '@/lib/calendar/constants';
 import { monthOf } from '@/lib/calendar/document';
-import { applyDesignToAll, exportPNG, goToPage, openDesignFile, printPages, saveDesignFile } from '@/store/actions';
+import { applyDesignToAll, exportPNG, goToPage, openDesignFile, printPages, saveCopy, saveDesignFile } from '@/store/actions';
 import { useCloudStore } from '@/store/useCloudStore';
 import { curPage, useStudioStore } from '@/store/useStudioStore';
 
@@ -23,13 +23,26 @@ export function useTopBarHandler() {
     const role = pg.role === 'photo' ? ' photo' : pg.role === 'cal' ? ' calendar' : '';
     return `Page ${s.doc.cur + 1} of ${s.doc.pages.length} · ${MONTHS[m]}${role}`;
   });
-  const canUndo = useStudioStore((s) => s.past.length > 0);
-  const canRedo = useStudioStore((s) => s.future.length > 0);
-  const cloud = useCloudStore((s) => s.designId !== null);
+  const readOnly = useStudioStore((s) => s.readOnly);
+  const canUndo = useStudioStore((s) => !s.readOnly && s.past.length > 0);
+  const canRedo = useStudioStore((s) => !s.readOnly && s.future.length > 0);
+  const designId = useCloudStore((s) => s.designId);
+  const role = useCloudStore((s) => (s.designId ? s.role : null));
+  // Lost access: the banner offers the copy instead.
+  const denied = useCloudStore((s) => s.status.state === 'denied');
+  const [sharing, setSharing] = useState(false);
   const st = useStudioStore.getState;
   return {
     framed,
-    cloud,
+    cloud: designId !== null,
+    designId,
+    readOnly,
+    owner: role === 'owner',
+    viewer: role === 'viewer' && !denied,
+    sharing: sharing && role === 'owner',
+    openShare: () => setSharing(true),
+    closeShare: () => setSharing(false),
+    saveCopy: () => void saveCopy(),
     saveFile: saveDesignFile,
     openFile: openDesignFile,
     label,

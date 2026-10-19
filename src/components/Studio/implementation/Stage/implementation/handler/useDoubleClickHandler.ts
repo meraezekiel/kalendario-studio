@@ -15,6 +15,10 @@ export function useDoubleClickHandler() {
     const st = useStudioStore.getState();
     const el = findEl(st.doc, elN.dataset.id ?? null);
     if (!el) return false;
+    if (st.readOnly) {
+      st.mutate(() => {}); // says the design is view only
+      return true;
+    }
 
     const num = T.closest('.cell[data-day] .num');
     if (el.type === 'cal' && num) {

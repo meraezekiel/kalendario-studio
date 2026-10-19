@@ -15,7 +15,7 @@ import { useStudioHandler } from './useStudioHandler';
 
 /** The calendar editor: top bar, tool rail + drawer, canvas, inspector. With `designId`, edits a cloud design. */
 export default function Studio({ designId }: { designId?: string }) {
-  const { ready, denied } = useStudioHandler(designId);
+  const { ready, denied, readOnly } = useStudioHandler(designId);
   if (denied) {
     return (
       <main className="auth-page">
@@ -31,7 +31,7 @@ export default function Studio({ designId }: { designId?: string }) {
   if (!ready) return <div className="boot">Loading Kalendaryo Studio…</div>;
   return (
     <>
-      <div className="app">
+      <div className={readOnly ? 'app readonly' : 'app'}>
         <TopBar />
         <ToolRail />
         <Drawer />
@@ -42,7 +42,7 @@ export default function Studio({ designId }: { designId?: string }) {
       <ExportBox />
       <Toast />
       <ThanksNote />
-      {!designId && <CloudBanner />}
+      <CloudBanner cloud={!!designId} />
     </>
   );
 }

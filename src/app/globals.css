@@ -306,3 +306,19 @@ input.cloud-name:focus-visible{outline:2px solid var(--sel);outline-offset:1px;b
 .dcard-badge{background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;font-weight:600}
 .dcard-acts{display:flex;gap:6px;margin-top:2px}
 .dcard-acts .btn{flex:1;padding:6px 8px;font-size:12px}
+/* sharing and view only */
+.modal:has(.share-form){width:460px}
+.share-form{display:flex;gap:8px;align-items:flex-end;margin-bottom:10px}
+.share-form .share-email{flex:1;margin:0}
+.share-form input[type=email]{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:100%;min-width:0;color:var(--ink)}
+.share-form input:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
+.share-form select{width:auto;flex:none}
+.share-list{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;max-height:260px;overflow:auto}
+.share-list li{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line)}
+.share-list select{width:auto;flex:none}
+.share-who{flex:1;min-width:0;display:flex;flex-direction:column}
+.share-mail{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.view-badge{flex:none;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+/* Wraps editing controls so a view-only design disables them all; adds no box of its own. */
+.edit-lock{display:contents}
+@media (max-width:520px){.share-form{flex-wrap:wrap}.share-form .share-email{flex-basis:100%}}
