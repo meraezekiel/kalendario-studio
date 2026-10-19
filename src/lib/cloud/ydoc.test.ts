@@ -1,0 +1,127 @@
+import { describe, expect, it } from 'vitest';
+import * as Y from 'yjs';
+import { TEMPLATES } from '../calendar/templates';
+import type { CalendarDoc, TextEl } from '../calendar/types';
+import { applyDiff, fromB64, readDoc, ROOT, toB64, writeDoc } from './ydoc';
+
+const mkDoc = (): CalendarDoc => ({ v: 3, year: 2027, holidays: true, cur: 0, assets: { a1: { src: 'data:x', w: 1, h: 2 } }, tray: ['a1'], pages: TEMPLATES.pastel.make() });
+const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
+const sync = (a: Y.Doc, b: Y.Doc) => {
+  Y.applyUpdate(b, Y.encodeStateAsUpdate(a, Y.encodeStateVector(b)));
+  Y.applyUpdate(a, Y.encodeStateAsUpdate(b, Y.encodeStateVector(a)));
+};
+const pair = (doc: CalendarDoc) => {
+  const a = new Y.Doc();
+  writeDoc(a, doc);
+  const b = new Y.Doc();
+  Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+  return [a, b] as const;
+};
+const edit = (doc: CalendarDoc, fn: (d: CalendarDoc) => void) => {
+  const n = clone(doc);
+  fn(n);
+  return n;
+};
+
+describe('ydoc', () => {
+  it('round-trips a doc except cur', () => {
+    const doc = mkDoc();
+    const y = new Y.Doc();
+    expect(readDoc(y)).toBeNull();
+    writeDoc(y, doc);
+    const { cur, ...rest } = doc;
+    expect(cur).toBe(0);
+    expect(readDoc(y)).toEqual(rest);
+  });
+
+  it('applyDiff of a moved element only touches that element', () => {
+    const doc = mkDoc();
+    const y = new Y.Doc();
+    writeDoc(y, doc);
+    const pages = y.getMap(ROOT).get('pages') as Y.Array<Y.Map<unknown>>;
+    const elArr = pages.get(0).get('els') as Y.Array<Y.Map<unknown>>;
+    const touched: string[] = [];
+    elArr.observeDeep((evs) => evs.forEach((e) => e.path.length && touched.push(String(e.path[0]))));
+    const next = edit(doc, (d) => { d.pages[0].els[0].x += 10; });
+    applyDiff(y, doc, next);
+    expect(touched.length).toBeGreaterThan(0);
+    expect(touched.every((p) => p === '0')).toBe(true);
+    expect(readDoc(y)!.pages[0].els[0].x).toBe(next.pages[0].els[0].x);
+  });
+
+  it('moving an element leaves the others in place', () => {
+    const doc = mkDoc();
+    const y = new Y.Doc();
+    writeDoc(y, doc);
+    const next = edit(doc, (d) => { d.pages[0].els.push(d.pages[0].els.shift()!); });
+    const pages = y.getMap(ROOT).get('pages') as Y.Array<Y.Map<unknown>>;
+    const elArr = pages.get(0).get('els') as Y.Array<Y.Map<unknown>>;
+    const before = elArr.toArray().slice(1);
+    applyDiff(y, doc, next);
+    const after = elArr.toArray().slice(0, -1);
+    expect(after.every((m, i) => m === before[i])).toBe(true);
+  });
+
+  it('concurrent edits to different elements both survive', () => {
+    const doc = mkDoc();
+    const [a, b] = pair(doc);
+    const na = edit(doc, (d) => { d.pages[0].els[0].x = 123; });
+    const nb = edit(doc, (d) => { (d.pages[0].els[1] as TextEl).text = 'hello'; });
+    applyDiff(a, doc, na);
+    applyDiff(b, doc, nb);
+    sync(a, b);
+    for (const y of [a, b]) {
+      const r = readDoc(y)!;
+      expect(r.pages[0].els[0].x).toBe(123);
+      expect((r.pages[0].els[1] as TextEl).text).toBe('hello');
+    }
+  });
+
+  it('concurrent edits to the same field converge to one value', () => {
+    const doc = mkDoc();
+    const [a, b] = pair(doc);
+    applyDiff(a, doc, edit(doc, (d) => { d.pages[0].els[0].x = 1; }));
+    applyDiff(b, doc, edit(doc, (d) => { d.pages[0].els[0].x = 2; }));
+    sync(a, b);
+    expect(readDoc(a)).toEqual(readDoc(b));
+    expect([1, 2]).toContain(readDoc(a)!.pages[0].els[0].x);
+  });
+
+  it('delete on one side and edit on the other converges', () => {
+    const doc = mkDoc();
+    const id = doc.pages[0].els[0].id;
+    const [a, b] = pair(doc);
+    applyDiff(a, doc, edit(doc, (d) => { d.pages[0].els.splice(0, 1); }));
+    applyDiff(b, doc, edit(doc, (d) => { d.pages[0].els[0].x = 77; }));
+    sync(a, b);
+    expect(readDoc(a)).toEqual(readDoc(b));
+    expect(readDoc(a)!.pages[0].els.some((e) => e.id === id)).toBe(false);
+  });
+
+  it('reordering els keeps all elements', () => {
+    const doc = mkDoc();
+    const y = new Y.Doc();
+    writeDoc(y, doc);
+    const next = edit(doc, (d) => { d.pages[0].els.push(d.pages[0].els.shift()!); });
+    applyDiff(y, doc, next);
+    expect(readDoc(y)!.pages[0].els).toEqual(next.pages[0].els);
+    const back = edit(next, (d) => { d.pages[0].els.unshift(d.pages[0].els.pop()!); });
+    applyDiff(y, next, back);
+    expect(readDoc(y)!.pages[0].els).toEqual(back.pages[0].els);
+  });
+
+  it('cur changes produce no Y update', () => {
+    const doc = mkDoc();
+    const y = new Y.Doc();
+    writeDoc(y, doc);
+    let n = 0;
+    y.on('update', () => n++);
+    applyDiff(y, doc, { ...doc, cur: 2 });
+    expect(n).toBe(0);
+  });
+
+  it('toB64/fromB64 round-trip', () => {
+    const u = new Uint8Array(70000).map((_, i) => i % 256);
+    expect(fromB64(toB64(u))).toEqual(u);
+  });
+});
