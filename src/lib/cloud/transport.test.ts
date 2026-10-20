@@ -12,6 +12,7 @@ function fakeClient() {
   };
   const client = {
     channel: () => ch,
+    getChannels: () => [],
     realtime: { setAuth: async () => {} },
     removeChannel: async () => 'ok',
   } as unknown as SupabaseClient;
@@ -53,6 +54,82 @@ describe('SupabaseTransport.subscribe', () => {
     const t = await live(vi.fn(() => { throw new Error('bad update'); }));
     expect(() => t.insert({ id: 9, data: 'AA==', author: 'u' })).not.toThrow();
     expect(t.statuses).toEqual(['live', 'offline', 'live']);
+  });
+
+  it('swaps in a fresh channel after the server refuses the join, and goes live on it', async () => {
+    vi.useFakeTimers();
+    try {
+      // Each channel() call makes a new channel; removed ones leave the list, like realtime-js.
+      const made: { status: (s: string) => void; system?: (p: unknown) => void; topic: string }[] = [];
+      const listed = new Set<unknown>();
+      const client = {
+        channel: () => {
+          const c = {
+            topic: 'realtime:design:d',
+            status: (_s: string) => {},
+            system: undefined as ((p: unknown) => void) | undefined,
+            on(type: string, _f: unknown, cb: (p: unknown) => void) { if (type === 'system') c.system = cb; return c; },
+            subscribe(cb: (s: string) => void) { c.status = cb; return c; },
+          };
+          made.push(c);
+          listed.add(c);
+          return c;
+        },
+        getChannels: () => [...listed],
+        realtime: { setAuth: async () => {} },
+        removeChannel: async (c: unknown) => { listed.delete(c); return 'ok'; },
+      } as unknown as SupabaseClient;
+      const statuses: string[] = [];
+      const stop = new SupabaseTransport('d', 'me', client).subscribe(() => {}, (s) => statuses.push(s));
+      await vi.advanceTimersByTimeAsync(0);
+      made[0].status('CHANNEL_ERROR');
+      expect(statuses).toEqual(['offline']);
+      expect(made).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(made).toHaveLength(2);
+      expect(listed.has(made[0])).toBe(false);
+      made[1].status('SUBSCRIBED');
+      made[1].system!({ extension: 'postgres_changes', status: 'ok' });
+      expect(statuses).toEqual(['offline', 'live']);
+      // A late event from the failed channel changes nothing.
+      made[0].status('CLOSED');
+      expect(statuses).toEqual(['offline', 'live']);
+      stop();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(made).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps retrying with growing waits while the server keeps refusing', async () => {
+    vi.useFakeTimers();
+    try {
+      const made: { status: (s: string) => void }[] = [];
+      const client = {
+        channel: () => {
+          const c = { status: (_s: string) => {}, on() { return c; }, subscribe(cb: (s: string) => void) { c.status = cb; return c; } };
+          made.push(c);
+          return c;
+        },
+        getChannels: () => [],
+        realtime: { setAuth: async () => {} },
+        removeChannel: async () => 'ok',
+      } as unknown as SupabaseClient;
+      const stop = new SupabaseTransport('d', 'me', client).subscribe(() => {}, () => {});
+      await vi.advanceTimersByTimeAsync(0);
+      made[0].status('CHANNEL_ERROR');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(made).toHaveLength(2);
+      made[1].status('CHANNEL_ERROR');
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(made).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(made).toHaveLength(3);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('joins presence on the same channel with the given key and reports the state', async () => {

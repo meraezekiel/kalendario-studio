@@ -87,6 +87,46 @@ export class SupabaseTransport implements SyncTransport {
   }
 
   subscribe(onUpdate: (u: { id: number; data: string; author: string }) => void, onStatus: (s: 'live' | 'offline') => void) {
+    let closed = false;
+    let reported: 'live' | 'offline' | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    let stopChannel: () => Promise<unknown> = async () => {};
+    // realtime-js never rejoins a channel the server refused (CHANNEL_ERROR from the join reply), so
+    // any failure swaps in a fresh channel after a backoff; reaching 'live' again reloads what was missed.
+    const reopen = () => {
+      if (closed || retry) return;
+      retry = setTimeout(async () => {
+        await stopChannel().catch(() => {});
+        retry = null;
+        if (closed) return;
+        // channel() hands back a same-topic channel that is still listed; never reuse the failed one.
+        const topic = `realtime:design:${this.designId}`;
+        if (this.client.getChannels().some((c) => c.topic === topic)) return reopen();
+        stopChannel = this.open(onUpdate, report, reopen, () => { attempts = 0; });
+      }, Math.min(30_000, 1000 * 2 ** attempts++));
+    };
+    const report = (s: 'live' | 'offline') => {
+      if (closed || s === reported) return;
+      reported = s;
+      onStatus(s);
+    };
+    stopChannel = this.open(onUpdate, report, reopen, () => { attempts = 0; });
+    return () => {
+      if (closed) return;
+      closed = true;
+      if (retry) clearTimeout(retry);
+      void stopChannel();
+    };
+  }
+
+  /** Joins one design channel; returns a function that leaves it. `onFail` runs once if it stops working. */
+  private open(
+    onUpdate: (u: { id: number; data: string; author: string }) => void,
+    emit: (s: 'live' | 'offline') => void,
+    onFail: () => void,
+    onJoined: () => void,
+  ) {
     const pres = this.pres;
     const ch = this.client.channel(`design:${this.designId}`, { config: { private: true, ...(pres ? { presence: { key: pres.key } } : {}) } });
     this.ch = ch;
@@ -105,7 +145,7 @@ export class SupabaseTransport implements SyncTransport {
     const report = (s: 'live' | 'offline') => {
       if (closed || s === reported) return;
       reported = s;
-      onStatus(s);
+      emit(s);
     };
     // An update we couldn't deliver: blip offline -> live, so the engine reloads it via load().
     // When not live yet, the coming 'live' reloads anyway.
@@ -149,24 +189,26 @@ export class SupabaseTransport implements SyncTransport {
           if (closed) return;
           if (status === 'SUBSCRIBED') {
             joined = true;
+            onJoined();
             settle();
             // In case this server never sends the notice, go live anyway after a while.
             fallback ??= setTimeout(() => { fallback = null; listening = true; settle(); }, 5000);
           } else {
-            // CHANNEL_ERROR, TIMED_OUT, CLOSED; realtime-js keeps rejoining.
+            // CHANNEL_ERROR, TIMED_OUT, CLOSED.
             joined = listening = false;
             if (fallback) clearTimeout(fallback);
             fallback = null;
             report('offline');
+            onFail();
           }
         });
       });
-    return () => {
+    return async () => {
       if (closed) return;
       closed = true;
       if (fallback) clearTimeout(fallback);
       if (this.ch === ch) this.ch = null;
-      void this.client.removeChannel(ch);
+      await this.client.removeChannel(ch);
     };
   }
 
