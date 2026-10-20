@@ -23,9 +23,15 @@ export interface CellView {
   img: string | null;
   moon?: MoonView;
   tide?: TideView;
-  /** High and low water times, in order. */
-  times?: { key: number; text: string; style: CSSProperties }[];
-  timesStyle?: CSSProperties;
+  /** High waters along the top of the box, low waters along the bottom; morning on the left, afternoon on the right. */
+  tideRows?: { high: TideSlot[]; low: TideSlot[]; style: CSSProperties };
+}
+
+export interface TideSlot {
+  key: number;
+  text: string;
+  right: boolean;
+  style: CSSProperties;
 }
 
 export interface MoonView {
@@ -46,7 +52,11 @@ export interface TideView {
   color: string;
 }
 
-const H_ALIGN = { left: 'flex-start', center: 'center', right: 'flex-end' } as const;
+/** Rough width in em of tide text in Roboto Condensed Bold, rounded up so estimates never run short. */
+const EM: Record<string, number> = { ':': 0.25, '.': 0.25, ' ': 0.24, '-': 0.32, A: 0.6, P: 0.58, M: 0.8 };
+const textEm = (s: string) => [...s].reduce((w, ch) => w + (EM[ch] ?? 0.52), 0);
+
+const H_ALIGN ={ left: 'flex-start', center: 'center', right: 'flex-end' } as const;
 const NUM_POS = { center: ['center', 'center'], tl: ['flex-start', 'flex-start'], tr: ['flex-start', 'flex-end'] } as const;
 
 export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx, selDay: number | null) {
@@ -104,17 +114,24 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
   const [ai, jc] = NUM_POS[el.numPos] || NUM_POS.center;
   const pad = el.numPos === 'center' ? '0' : `${Math.round(L.ch * 0.08)}px ${Math.round(L.cw * 0.1)}px`;
 
-  // Tide times take the bottom of every box (room for four, so the numbers line up); the numbers shrink only if they must.
+  // Tide times, as on printed Philippine calendars: a row of highs across the top of every box and a row of lows
+  // across the bottom, each wide enough for two "12:49AM 1.6M" side by side. Numbers shrink only if they must.
   const place = tidePlace(el.tidePlace);
   const turns = place ? tideTurns(place, y, m) : {};
   const hiColor = el.tideHiColor || TIDE_HI_COLOR, loColor = el.tideLoColor || TIDE_LO_COLOR;
-  const timesSize = r1(Math.max(5, L.labelSize * 0.9));
-  const timesH = place ? Math.ceil(4 * timesSize * 1.1 + 5) : 0;
+  const tideText = (t: { min: number; h: number }) => `${clock(t.min).replace(' ', '')}${el.tideHeights ? ` ${heightText(place!, t.h)}` : ''}`.toUpperCase();
+  // The text is as big as the widest row this month allows (Roboto Condensed Bold widths, a little generous).
+  const rows = Object.values(turns).flatMap((ts) => [ts.filter((t) => t.high), ts.filter((t) => !t.high)]);
+  const widest = Math.max(6, ...rows.map((r) => r.reduce((w, t) => w + textEm(tideText(t)), r.length > 1 ? 0.4 : 0)));
+  const tideFont = r1(Math.max(5, Math.min(L.labelSize * 1.15, (L.cw - 8) / widest)));
+  const rowH = place ? Math.ceil(tideFont * 1.15 + 3) : 0;
   const padTop = el.numPos === 'center' ? 0 : Math.round(L.ch * 0.08);
-  const fitNum = (footH: number) => (footH ? Math.min(L.numSize, Math.round((L.ch - footH - padTop) * 0.85)) : L.numSize);
-  /** A holiday name above the times needs room too; a rough line count (bold capitals are about 0.7em wide). */
-  const footFor = (lbl: string) => timesH + (lbl ? Math.min(3, Math.ceil((lbl.length * L.labelSize * 0.7) / (L.cw - 6))) * L.labelSize * 1.08 + 2 : 0);
-  const numBase: CSSProperties = { fontFamily: `'${el.numFont}',sans-serif`, fontSize: fitNum(timesH), fontWeight: el.numBold ? 700 : 400 };
+  const fitNum = (top: number, bottom: number) => (top + bottom ? Math.min(L.numSize, Math.round((L.ch - top - bottom - padTop) * 0.85)) : L.numSize);
+  /** A holiday name above the lows needs room too; a rough line count (bold capitals are about 0.7em wide). */
+  const footFor = (lbl: string) => rowH + (lbl ? Math.min(3, Math.ceil((lbl.length * L.labelSize * 0.7) / (L.cw - 6))) * L.labelSize * 1.08 + 2 : 0);
+  const slots = (list: { min: number; h: number }[], color: string): TideSlot[] =>
+    list.map((t, k) => ({ key: k, text: tideText(t), right: list.length > 1 ? k > 0 : t.min >= 720, style: { color } }));
+  const numBase: CSSProperties = { fontFamily: `'${el.numFont}',sans-serif`, fontSize: fitNum(rowH, rowH), fontWeight: el.numBold ? 700 : 400 };
 
   // Moon phases go into the empty boxes in order; any that don't fit mark their own day instead.
   const phases = el.moon ? moonPhases(y, m) : [];
@@ -134,7 +151,7 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
   });
 
   const tides = el.tides ? tideDays(y, m) : {};
-  const timesStyle: CSSProperties = { fontSize: timesSize };
+  const tideStyle: CSSProperties = { fontSize: tideFont };
   const tideSize = Math.max(8, Math.round(Math.min(L.cw, L.ch) * 0.2));
 
   const cells: CellView[] = L.cells.map((c, i) => {
@@ -160,19 +177,23 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
     const dsel = ctx.edit && selDay === n;
     const label = lbl && L.ch > 22 ? lbl : '';
     const footH = place ? footFor(label) : 0;
+    const dayTurns = turns[n] ?? [];
     return {
       key: i,
       day: n,
-      className: `cell${dsel ? ' dsel' : ''}`,
-      style: { ...bord, ...rad, background: info.bg || el.cellBg, ...align, ...(footH ? { paddingBottom: footH } : {}) },
+      className: `cell${dsel ? ' dsel' : ''}${place ? ' tidal' : ''}`,
+      style: { ...bord, ...rad, background: info.bg || el.cellBg, ...align, ...(place ? { paddingTop: rowH + padTop, paddingBottom: footH } : {}) },
       num: info.num ?? String(n),
-      numStyle: { ...numBase, fontSize: fitNum(footH), color: hi ? el.hiColor : el.numColor },
+      numStyle: { ...numBase, fontSize: fitNum(rowH, footH), color: hi ? el.hiColor : el.numColor },
       label,
       labelStyle: { fontSize: L.labelSize, color: el.hiColor },
       img,
       moon: smallOn.has(n) ? smallMoon(smallOn.get(n)!, n) : undefined,
-      times: turns[n]?.map((t, k) => ({ key: k, text: `${t.high ? 'H' : 'L'} ${clock(t.min)}${el.tideHeights ? ` ${heightText(place!, t.h)}` : ''}`, style: { color: t.high ? hiColor : loColor } })),
-      timesStyle,
+      tideRows: place && {
+        high: slots(dayTurns.filter((t) => t.high), hiColor),
+        low: slots(dayTurns.filter((t) => !t.high), loColor),
+        style: tideStyle,
+      },
       tide: tides[n] && { kind: tides[n], name: TIDE_NAMES[tides[n]], size: tideSize, color: el.hiColor },
     };
   });

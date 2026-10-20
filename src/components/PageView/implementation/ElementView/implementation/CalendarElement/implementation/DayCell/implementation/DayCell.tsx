@@ -3,6 +3,7 @@
 import type { CellView } from '../../useCalendarElementHandler';
 import MoonIcon from './MoonIcon/implementation/MoonIcon';
 import TideIcon from './TideIcon/implementation/TideIcon';
+import TideRow from './TideRow/implementation/TideRow';
 import { useDayCellHandler } from './useDayCellHandler';
 
 interface Props {
@@ -23,14 +24,15 @@ export default function DayCell({ cell, calId, editing }: Props) {
         ) : (
           <span key="view" className="num" style={cell.numStyle}>{cell.num}</span>
         ))}
-      {cell.times ? (
-        // The holiday name sits above the tide times at the bottom of the box.
-        <div className="foot">
-          {cell.label && <span className="lbl" style={cell.labelStyle}>{cell.label}</span>}
-          <div className="times" style={cell.timesStyle}>
-            {cell.times.map((t) => <span key={t.key} style={t.style}>{t.text}</span>)}
+      {cell.tideRows ? (
+        <>
+          <TideRow slots={cell.tideRows.high} style={cell.tideRows.style} kind="high" />
+          {/* The holiday name sits above the low tides at the bottom of the box. */}
+          <div className="foot">
+            {cell.label && <span className="lbl" style={cell.labelStyle}>{cell.label}</span>}
+            <TideRow slots={cell.tideRows.low} style={cell.tideRows.style} kind="low" />
           </div>
-        </div>
+        </>
       ) : (
         cell.label && <span className="lbl" style={cell.labelStyle}>{cell.label}</span>
       )}

@@ -70,18 +70,23 @@ export default function CalendarSection({ el }: { el: CalEl }) {
           ))}
         </div>
         <CheckField label="Show holiday names in the boxes" {...bind('labels')} />
-        <CheckField label="Moon phases" value={!!el.moon} onChange={(v) => bind('moon').onChange(v)} />
-        <CheckField label="Spring & neap tides" value={!!el.tides} onChange={(v) => bind('tides').onChange(v)} />
+        <CheckField label="Side calendar (last / next month)" value={!!el.side} onChange={(v) => bind('side').onChange(v)} />
+        <p className="hint">Side calendars are skipped when counting months for “Fill the rest of the year”.</p>
+      </Section>
+      <Section title="Moon & tides" open={!!(el.moon || el.tides || el.tidePlace)}>
         <SelectField label="High & low tide times" options={h.tideOptions} value={el.tidePlace ?? ''} onChange={h.setTidePlace} />
         {el.tidePlace && (
-          <div className="g2">
-            <ColorField label="High tide color" value={el.tideHiColor || TIDE_HI_COLOR} onChange={(v) => bind('tideHiColor').onChange(v)} />
-            <ColorField label="Low tide color" value={el.tideLoColor || TIDE_LO_COLOR} onChange={(v) => bind('tideLoColor').onChange(v)} />
-          </div>
+          <>
+            <CheckField label="Tide heights (m)" value={!!el.tideHeights} onChange={(v) => bind('tideHeights').onChange(v)} />
+            <div className="g2">
+              <ColorField label="High tide color" value={el.tideHiColor || TIDE_HI_COLOR} onChange={(v) => bind('tideHiColor').onChange(v)} />
+              <ColorField label="Low tide color" value={el.tideLoColor || TIDE_LO_COLOR} onChange={(v) => bind('tideLoColor').onChange(v)} />
+            </div>
+          </>
         )}
-        {el.tidePlace && <CheckField label="Tide heights (m)" value={!!el.tideHeights} onChange={(v) => bind('tideHeights').onChange(v)} />}
-        <CheckField label="Side calendar (last / next month)" value={!!el.side} onChange={(v) => bind('side').onChange(v)} />
-        <p className="hint">Moon phases fill the empty boxes (Philippine time). Tide marks: solid arrows for spring tides (biggest rise and fall), open arrows for neap tides (smallest); times of high and low water depend on the place, so pick the nearest port and name it in your footnote. Heights are in metres above the average lowest tide of the day (mean lower low water, as in Philippine tide tables); a minus means an extra low tide (times worked out from University of Hawaii Sea Level Center tide gauge records, Philippine time). Side calendars are skipped when counting months for “Fill the rest of the year”.</p>
+        <CheckField label="Moon phases" value={!!el.moon} onChange={(v) => bind('moon').onChange(v)} />
+        <CheckField label="Spring & neap tides" value={!!el.tides} onChange={(v) => bind('tides').onChange(v)} />
+        <p className="hint">Pick the port nearest you: high tides run along the top of each box, low tides along the bottom (morning left, afternoon right), in Philippine time. Heights are metres above the average lowest tide of the day, as in Philippine tide tables; a minus means an extra-low tide. Name the port in your footnote. Times come from University of Hawaii Sea Level Center tide gauge records. Moon phases fill the empty boxes. Spring & neap marks: solid arrows for the biggest tides, open arrows for the smallest.</p>
       </Section>
       <Section title="Grid & boxes" open={false}>
         <CheckField label="Grid lines" {...bind('lines')} />

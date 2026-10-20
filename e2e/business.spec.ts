@@ -50,29 +50,38 @@ test.describe('Classic business calendar', () => {
     await page.getByLabel('Spring & neap tides').uncheck();
     await expect(main.locator('.tide')).toHaveCount(0);
 
-    // High and low water times for a chosen port: blue highs, red lows, am/pm.
+    // High and low water times for a chosen port, as on printed calendars: blue highs along the top,
+    // red lows along the bottom, morning on the left and afternoon on the right.
     await page.getByLabel('High & low tide times').selectOption({ label: 'Davao' });
-    const times = main.locator('.cell[data-day="15"] .times span');
-    await expect(times).toHaveCount(4);
-    await expect(times.first()).toHaveText(/^[HL] \d{1,2}:\d\d [ap]m -?\d\.\dm$/);
-    await expect(main.locator('.times span', { hasText: /^H / }).first()).toHaveCSS('color', 'rgb(29, 95, 191)');
-    await expect(main.locator('.times span', { hasText: /^L / }).first()).toHaveCSS('color', 'rgb(214, 40, 40)');
-    await page.screenshot({ path: 'e2e/shots/47-tide-times.png' });
-    // A two-line label above four tide times still stays below the day number.
     const d15 = main.locator('.cell[data-day="15"]');
+    const highs = d15.locator('.tt-high span'), lows = d15.locator('.tt-low span');
+    await expect(highs).toHaveText([/^5:26AM \d\.\dM$/, /^5:02PM \d\.\dM$/]);
+    await expect(lows).toHaveText([/^11:03AM -?\d\.\dM$/, /^11:37PM -?\d\.\dM$/]);
+    await expect(highs.nth(1)).toHaveClass('r');
+    await expect(highs.first()).toHaveCSS('color', 'rgb(29, 95, 191)');
+    await expect(lows.first()).toHaveCSS('color', 'rgb(214, 40, 40)');
+    // A lone afternoon tide sits on the right, a lone morning one on the left.
+    const sides = await main.evaluate((el) =>
+      [...el.querySelectorAll('.tt')].filter((r) => r.children.length === 1).every((r) => (r.children[0].className === 'r') === r.children[0].textContent!.includes('PM')),
+    );
+    expect(sides).toBe(true);
+    await page.screenshot({ path: 'e2e/shots/47-tide-times.png' });
+    // A two-line label above the low tides still stays below the day number, and the highs above it.
     await d15.click();
     await page.getByLabel('Label').fill('Town fiesta and birthday');
     await expect(d15.locator('.lbl')).toHaveText('Town fiesta and birthday');
     const gap = await d15.evaluate((c) => c.querySelector('.foot')!.getBoundingClientRect().top - c.querySelector('.num')!.getBoundingClientRect().bottom);
     expect(gap).toBeGreaterThanOrEqual(-1);
+    const above = await d15.evaluate((c) => c.querySelector('.num')!.getBoundingClientRect().top - c.querySelector('.tt-high')!.getBoundingClientRect().bottom);
+    expect(above).toBeGreaterThanOrEqual(-1);
     await main.click({ position: { x: 5, y: 5 } });
     await page.getByLabel('Tide heights (m)').uncheck();
-    await expect(times.first()).toHaveText(/^[HL] \d{1,2}:\d\d [ap]m$/);
+    await expect(highs.first()).toHaveText('5:26AM');
     await page.getByLabel('Tide heights (m)').check();
     await page.getByLabel('High tide color').fill('#008000');
-    await expect(main.locator('.times span', { hasText: /^H / }).first()).toHaveCSS('color', 'rgb(0, 128, 0)');
+    await expect(highs.first()).toHaveCSS('color', 'rgb(0, 128, 0)');
     await page.getByLabel('High & low tide times').selectOption({ label: 'Off' });
-    await expect(main.locator('.times')).toHaveCount(0);
+    await expect(main.locator('.tt')).toHaveCount(0);
     await page.getByLabel('Moon phases').uncheck();
     await expect(main.locator('.moon-sm')).toHaveCount(0);
     await list.click();

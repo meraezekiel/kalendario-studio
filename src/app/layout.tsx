@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: 'device-width', initialScale: 1 };
 
 const FONTS_URL =
-  'https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Caveat:wght@600;700&family=Cormorant+Garamond:wght@600;700&family=Dancing+Script:wght@600;700&family=Figtree:wght@400;500;600;700&family=Fredoka:wght@400;500;600;700&family=Lilita+One&family=Montserrat:wght@400;600;800&family=Pacifico&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;500;600;700;800&display=swap';
+  'https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Caveat:wght@600;700&family=Cormorant+Garamond:wght@600;700&family=Dancing+Script:wght@600;700&family=Figtree:wght@400;500;600;700&family=Fredoka:wght@400;500;600;700&family=Lilita+One&family=Montserrat:wght@400;600;800&family=Pacifico&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;500;600;700;800&family=Roboto+Condensed:wght@600;700&display=swap';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
