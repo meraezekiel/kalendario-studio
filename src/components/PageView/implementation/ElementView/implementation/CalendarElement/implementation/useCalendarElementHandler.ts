@@ -6,7 +6,7 @@ import { holidays } from '@/lib/calendar/holidays';
 import { MOON_NAMES, type MoonPhase, moonPhases, TIDE_NAMES, type TideKind, tideDays } from '@/lib/calendar/moon';
 import type { RenderCtx } from '@/lib/calendar/render';
 import type { CalEl, Page } from '@/lib/calendar/types';
-import { clock, tideTurns } from '@/lib/calendar/tide';
+import { clock, heightText, tideTurns } from '@/lib/calendar/tide';
 import { TIDE_HI_COLOR, TIDE_LO_COLOR, tidePlace } from '@/lib/calendar/tidePlaces';
 import { r1 } from '@/lib/calendar/utils';
 
@@ -110,7 +110,8 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
   const hiColor = el.tideHiColor || TIDE_HI_COLOR, loColor = el.tideLoColor || TIDE_LO_COLOR;
   const timesSize = r1(Math.max(5, L.labelSize * 0.9));
   const timesH = place ? Math.ceil(4 * timesSize * 1.1 + 5) : 0;
-  const fitNum = (footH: number) => (footH ? Math.min(L.numSize, Math.round((L.ch - footH) * 0.85)) : L.numSize);
+  const padTop = el.numPos === 'center' ? 0 : Math.round(L.ch * 0.08);
+  const fitNum = (footH: number) => (footH ? Math.min(L.numSize, Math.round((L.ch - footH - padTop) * 0.85)) : L.numSize);
   /** A holiday name above the times needs room too; a rough line count (bold capitals are about 0.7em wide). */
   const footFor = (lbl: string) => timesH + (lbl ? Math.min(3, Math.ceil((lbl.length * L.labelSize * 0.7) / (L.cw - 6))) * L.labelSize * 1.08 + 2 : 0);
   const numBase: CSSProperties = { fontFamily: `'${el.numFont}',sans-serif`, fontSize: fitNum(timesH), fontWeight: el.numBold ? 700 : 400 };
@@ -170,7 +171,7 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
       labelStyle: { fontSize: L.labelSize, color: el.hiColor },
       img,
       moon: smallOn.has(n) ? smallMoon(smallOn.get(n)!, n) : undefined,
-      times: turns[n]?.map((t, k) => ({ key: k, text: `${t.high ? 'H' : 'L'} ${clock(t.min)}`, style: { color: t.high ? hiColor : loColor } })),
+      times: turns[n]?.map((t, k) => ({ key: k, text: `${t.high ? 'H' : 'L'} ${clock(t.min)}${el.tideHeights ? ` ${heightText(place!, t.h)}` : ''}`, style: { color: t.high ? hiColor : loColor } })),
       timesStyle,
       tide: tides[n] && { kind: tides[n], name: TIDE_NAMES[tides[n]], size: tideSize, color: el.hiColor },
     };

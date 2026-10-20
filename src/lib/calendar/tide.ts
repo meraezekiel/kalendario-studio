@@ -10,6 +10,8 @@ export interface TideStation {
   name: string;
   /** Mean level (m) over the fitted records. */
   z0: number;
+  /** Mean lower low water (m, same reference as z0): printed heights are measured from it, as in Philippine tide tables. */
+  datum: number;
   /** Constituent name → [amplitude in m, phase lag g in degrees]. */
   c: Record<string, [number, number]>;
 }
@@ -155,6 +157,12 @@ export function tideTurns(st: TideStation, y: number, m: number, tzHours = 8): R
     (out[local.getUTCDate()] ??= []).push({ high: x.high, min: Math.min(min, 1439), h: x.h });
   }
   return out;
+}
+
+/** Height above mean lower low water to the nearest 10 cm: "1.6m", "0.0m", "-0.2m". */
+export function heightText(st: TideStation, h: number): string {
+  const v = Math.round((h - st.datum) * 10) / 10;
+  return `${(v || 0).toFixed(1)}m`;
 }
 
 /** "5:07 am", "12:30 pm". */

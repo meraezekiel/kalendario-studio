@@ -102,14 +102,40 @@ function quadratic(pts) {
 const YEAR = 365.25 * 86400000;
 const between = (obs, from, to) => obs.filter(([t]) => t >= from && t < to);
 
-/** RMS height error, and how far off the predicted times of high and low water are (minutes, median and 90th percentile). */
+/**
+ * Mean lower low water: the average of each day's lowest tide over a 19-year lunar node cycle, the level
+ * Philippine (NAMRIA) tide tables measure heights from. In the same units and reference as z0.
+ */
+function mllw(st) {
+  let sum = 0, n = 0;
+  for (let y = 2016; y < 2035; y++) {
+    for (let m = 0; m < 12; m++) {
+      for (const turns of Object.values(tideTurns(st, y, m))) {
+        const lows = turns.filter((t) => !t.high).map((t) => t.h);
+        if (lows.length) { sum += Math.min(...lows); n++; }
+      }
+    }
+  }
+  return Math.round((sum / n) * 1e4) / 1e4;
+}
+
+/**
+ * RMS height error, how far off the predicted times of high and low water are (minutes, median and
+ * 90th percentile), and how far off their heights are once the year's mean level is matched (the gauge's
+ * zero and the sea level drift over the years; the printed heights are measured from MLLW instead).
+ */
 function score(st, obs) {
-  let se = 0;
-  for (const [t, z] of obs) se += (tideHeight(st, t) - z) ** 2;
+  let se = 0, offset = 0;
+  for (const [t, z] of obs) {
+    const p = tideHeight(st, t);
+    se += (p - z) ** 2;
+    offset += z - p;
+  }
+  offset /= obs.length;
   // For each predicted high and low, fit a parabola to the gauge's hourly heights within 3 hours of it.
   const at = new Map(obs.map(([t, z]) => [t, z]));
   const from = new Date(obs[0][0]), to = new Date(obs[obs.length - 1][0]);
-  const diffs = [];
+  const diffs = [], hdiffs = [];
   let missed = 0;
   for (let y = from.getUTCFullYear(), m = from.getUTCMonth(); y * 12 + m <= to.getUTCFullYear() * 12 + to.getUTCMonth(); m === 11 ? (y++, (m = 0)) : m++) {
     for (const [day, turns] of Object.entries(tideTurns(st, y, m, 0))) {
@@ -118,25 +144,29 @@ function score(st, obs) {
         const pts = [];
         for (let k = -3; k <= 3; k++) if (at.has(hour + k * 3600000)) pts.push([(hour + k * 3600000 - t0) / 3600000, at.get(hour + k * 3600000)]);
         if (pts.length < 7) continue;
-        const [, b, c] = quadratic(pts);
+        const [a, b, c] = quadratic(pts);
         const v = -b / (2 * c);
         if ((turn.high ? c >= 0 : c <= 0) || Math.abs(v) > 3) missed++;
-        else diffs.push(Math.abs(v) * 60);
+        else {
+          diffs.push(Math.abs(v) * 60);
+          hdiffs.push(Math.abs(a + b * v + c * v * v - (turn.h + offset)) * 100);
+        }
       }
     }
   }
-  diffs.sort((x, y) => x - y);
-  const q = (p) => Math.round(diffs[Math.floor(p * (diffs.length - 1))] ?? NaN);
-  return `rms ${(Math.sqrt(se / obs.length) * 100).toFixed(1)} cm, turn times median ${q(0.5)} min off, 90% within ${q(0.9)} min, ${missed} of ${missed + diffs.length} not seen by the gauge`;
+  const q = (xs, p) => Math.round([...xs].sort((x, y) => x - y)[Math.floor(p * (xs.length - 1))] ?? NaN);
+  return `rms ${(Math.sqrt(se / obs.length) * 100).toFixed(1)} cm, turn times median ${q(diffs, 0.5)} min off, 90% within ${q(diffs, 0.9)} min, `
+    + `heights median ${q(hdiffs, 0.5)} cm off, 90% within ${q(hdiffs, 0.9)} cm, ${missed} of ${missed + diffs.length} not seen by the gauge`;
 }
 
 const out = [];
 for (const [code, id, name] of STATIONS) {
   const obs = await records(code);
   const last = obs[obs.length - 1][0];
-  const st = { id, name, ...fit(between(obs, last - FIT_YEARS * YEAR, last + 1)) };
+  const fitted = fit(between(obs, last - FIT_YEARS * YEAR, last + 1));
+  const st = { id, name, z0: fitted.z0, datum: mllw({ ...fitted, id, name }), c: fitted.c };
   const years = `${new Date(last - FIT_YEARS * YEAR).getUTCFullYear()}–${new Date(last).getUTCFullYear()}`;
-  console.log(`${name}: fitted ${years}, M2 ${st.c.M2[0]} m, K1 ${st.c.K1[0]} m, O1 ${st.c.O1[0]} m`);
+  console.log(`${name}: fitted ${years}, M2 ${st.c.M2[0]} m, K1 ${st.c.K1[0]} m, O1 ${st.c.O1[0]} m, MLLW ${(st.datum - st.z0).toFixed(2)} m below mean`);
   if (check) {
     // Fit on the first years only, then predict the last year, as far apart as the records allow.
     const first = obs[0][0];

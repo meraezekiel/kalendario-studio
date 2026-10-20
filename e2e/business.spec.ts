@@ -54,7 +54,7 @@ test.describe('Classic business calendar', () => {
     await page.getByLabel('High & low tide times').selectOption({ label: 'Davao' });
     const times = main.locator('.cell[data-day="15"] .times span');
     await expect(times).toHaveCount(4);
-    await expect(times.first()).toHaveText(/^[HL] \d{1,2}:\d\d [ap]m$/);
+    await expect(times.first()).toHaveText(/^[HL] \d{1,2}:\d\d [ap]m -?\d\.\dm$/);
     await expect(main.locator('.times span', { hasText: /^H / }).first()).toHaveCSS('color', 'rgb(29, 95, 191)');
     await expect(main.locator('.times span', { hasText: /^L / }).first()).toHaveCSS('color', 'rgb(214, 40, 40)');
     await page.screenshot({ path: 'e2e/shots/47-tide-times.png' });
@@ -66,6 +66,9 @@ test.describe('Classic business calendar', () => {
     const gap = await d15.evaluate((c) => c.querySelector('.foot')!.getBoundingClientRect().top - c.querySelector('.num')!.getBoundingClientRect().bottom);
     expect(gap).toBeGreaterThanOrEqual(-1);
     await main.click({ position: { x: 5, y: 5 } });
+    await page.getByLabel('Tide heights (m)').uncheck();
+    await expect(times.first()).toHaveText(/^[HL] \d{1,2}:\d\d [ap]m$/);
+    await page.getByLabel('Tide heights (m)').check();
     await page.getByLabel('High tide color').fill('#008000');
     await expect(main.locator('.times span', { hasText: /^H / }).first()).toHaveCSS('color', 'rgb(0, 128, 0)');
     await page.getByLabel('High & low tide times').selectOption({ label: 'Off' });

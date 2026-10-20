@@ -114,6 +114,8 @@ export interface CalEl extends BaseEl {
   tidePlace?: string;
   tideHiColor?: string;
   tideLoColor?: string;
+  /** Adds each tide's height (m above mean lower low water) after its time. */
+  tideHeights?: boolean;
   /** A small side calendar (e.g. last or next month); not counted when filling the year. */
   side?: boolean;
   days: Record<number, DayInfo>;

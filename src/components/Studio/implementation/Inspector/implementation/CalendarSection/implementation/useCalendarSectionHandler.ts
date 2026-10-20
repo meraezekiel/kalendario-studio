@@ -14,7 +14,8 @@ export function useCalendarSectionHandler(el: CalEl) {
     bind,
     moOptions,
     tideOptions: [['', 'Off'], ...TIDE_PLACES.map((p) => [p.id, p.name] as const)] as const,
-    setTidePlace: (id: string) => updateEl<CalEl>(el.id, { tidePlace: id || undefined }),
+    // Heights come on with the first place picked; after that the checkbox decides.
+    setTidePlace: (id: string) => updateEl<CalEl>(el.id, { tidePlace: id || undefined, tideHeights: el.tideHeights ?? (id ? true : undefined) }),
     weekdays: DS.map((d, i) => ({ i, label: d.slice(0, 2), on: el.hiDays.includes(i) })),
     toggleHiDay: (d: number) =>
       updateEl<CalEl>(el.id, { hiDays: el.hiDays.includes(d) ? el.hiDays.filter((x) => x !== d) : [...el.hiDays, d] }),
