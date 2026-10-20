@@ -1,8 +1,9 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-// Literal property access so Next inlines them into the client bundle.
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Literal property access so Next inlines them into the client bundle. Trimmed: a stray space pasted
+// into a hosting dashboard survives in the realtime URL (?apikey=) and gets every live connection a 401.
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
 let client: SupabaseClient | null = null;
 
