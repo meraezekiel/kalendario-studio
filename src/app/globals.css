@@ -45,8 +45,15 @@ button,input,select,textarea{font:inherit;color:inherit}
 .drawer{grid-area:drawer;border-right:1px solid var(--line)}
 .insp{grid-area:insp;border-left:1px solid var(--line);gap:10px}
 .stage-col{grid-area:stage;display:flex;flex-direction:column;min-width:0;min-height:0}
-.stage{flex:1;overflow:auto;padding:20px 16px;display:flex;justify-content:center;align-items:flex-start;min-height:0}
-.scaler{position:relative;flex:none}
+.stage{flex:1;overflow:auto;padding:20px 16px;display:flex;align-items:flex-start;min-height:0}
+/* margin:auto centres like justify-content:center, but a zoomed page wider than the stage still scrolls to its left edge. */
+.scaler{position:relative;flex:none;margin:0 auto}
+.stagefoot{display:flex;align-items:center;flex:none;min-width:0}
+.stagefoot .pagebar{flex:1;min-width:0}
+.zoombar{display:flex;align-items:center;gap:4px;padding:8px 16px 12px 4px;flex:none}
+.zoombar button{border:1px solid var(--line);background:var(--panel);border-radius:8px;min-width:30px;padding:5px 8px;font-size:12px;font-weight:600;cursor:pointer;color:inherit}
+.zoombar button:disabled{opacity:.45;cursor:default}
+.zoom-pct{min-width:42px;text-align:center;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
 .ph{position:absolute;left:0;top:0;transform-origin:top left;touch-action:none;box-shadow:0 18px 50px rgba(30,10,40,.22),0 2px 6px rgba(30,10,40,.12)}
 .pagebar{display:flex;gap:6px;padding:8px 16px 12px;overflow-x:auto;flex:none}
 .pagebar button{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}

@@ -5,6 +5,7 @@ import { curPage, useStudioStore } from '@/store/useStudioStore';
 import { useDropHandler } from './handler/useDropHandler';
 import { useFitHandler } from './handler/useFitHandler';
 import { usePointerHandler } from './handler/usePointerHandler';
+import { useZoomHandler } from './handler/useZoomHandler';
 
 export function useStageHandler() {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -13,7 +14,9 @@ export function useStageHandler() {
   const armed = useStudioStore((s) => s.armed);
   const readOnly = useStudioStore((s) => s.readOnly);
   const H = dims(page).H;
-  const scale = useFitHandler(wrapRef, H);
+  const fit = useFitHandler(wrapRef, H);
+  const zoom = useZoomHandler(wrapRef, phRef, fit);
+  const scale = zoom.scale;
   const pointer = usePointerHandler(wrapRef, phRef, scale);
   const drop = useDropHandler(pointer.pagePt);
 
@@ -28,5 +31,6 @@ export function useStageHandler() {
     phStyle: { transform: `scale(${scale})`, '--inv': (1 / scale).toFixed(3) } as React.CSSProperties,
     pointer,
     drop,
+    zoom,
   };
 }

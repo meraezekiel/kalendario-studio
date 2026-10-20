@@ -5,9 +5,10 @@ import OthersOverlay from './OthersOverlay/implementation/OthersOverlay';
 import PageBar from './PageBar/implementation/PageBar';
 import SelectionOverlay from './SelectionOverlay/implementation/SelectionOverlay';
 import { useStageHandler } from './useStageHandler';
+import ZoomBar from './ZoomBar/implementation/ZoomBar';
 
 export default function Stage() {
-  const { wrapRef, phRef, page, readOnly, armed, scalerStyle, phStyle, pointer, drop } = useStageHandler();
+  const { wrapRef, phRef, page, readOnly, armed, scalerStyle, phStyle, pointer, drop, zoom } = useStageHandler();
   return (
     <main className="stage-col">
       {armed !== null && <div className="armbar">Tap a photo frame, a day, or an empty spot to place the image · Esc to cancel</div>}
@@ -31,7 +32,10 @@ export default function Stage() {
           </div>
         </div>
       </div>
-      <PageBar />
+      <div className="stagefoot">
+        <PageBar />
+        <ZoomBar {...zoom} />
+      </div>
     </main>
   );
 }
