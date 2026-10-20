@@ -108,6 +108,8 @@ export interface CalEl extends BaseEl {
   adjacent: boolean;
   /** Shows the moon phases, in the empty boxes when there is room, otherwise as small icons on their days. */
   moon?: boolean;
+  /** Marks spring tides (new and full moon) and neap tides (quarter moons) with a small icon on their days. */
+  tides?: boolean;
   /** A small side calendar (e.g. last or next month); not counted when filling the year. */
   side?: boolean;
   days: Record<number, DayInfo>;

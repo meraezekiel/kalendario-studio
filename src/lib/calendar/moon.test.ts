@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { moonPhases } from './moon';
+import { moonPhases, tideDays } from './moon';
 
 const brief = (y: number, m: number) => moonPhases(y, m).map((p) => [p.phase, p.day]);
 
@@ -22,5 +22,27 @@ describe('moonPhases (Philippine time)', () => {
       expect(n).toBeGreaterThanOrEqual(3);
       expect(n).toBeLessThanOrEqual(5);
     }
+  });
+});
+
+describe('tideDays', () => {
+  it('marks spring tides at new and full moon and neap tides at the quarters, plus the day after', () => {
+    // October 2026: LQ 3, NM 10, FQ 19, FM 26.
+    expect(tideDays(2026, 9)).toEqual({
+      3: 'neap', 4: 'neap', 10: 'spring', 11: 'spring', 19: 'neap', 20: 'neap', 26: 'spring', 27: 'spring',
+    });
+  });
+  it('carries a phase on the last day of a month into the 1st of the next', () => {
+    // Find a month whose last phase falls on its last day and check the 1st of the following month.
+    for (let y = 2025; y <= 2030; y++) {
+      for (let m = 0; m < 12; m++) {
+        const p = moonPhases(y, m).at(-1)!;
+        if (p.day !== new Date(Date.UTC(y, m + 1, 0)).getUTCDate()) continue;
+        const [ny, nm] = m === 11 ? [y + 1, 0] : [y, m + 1];
+        expect(tideDays(ny, nm)[1]).toBe(p.phase % 2 ? 'neap' : 'spring');
+        return;
+      }
+    }
+    expect.unreachable('no month from 2025 to 2030 ends on a phase');
   });
 });

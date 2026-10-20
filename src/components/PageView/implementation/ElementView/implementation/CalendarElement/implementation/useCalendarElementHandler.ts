@@ -3,7 +3,7 @@ import { calendarLayout } from '@/lib/calendar/calendarLayout';
 import { MONTHS, PILLS } from '@/lib/calendar/constants';
 import { monthOf, tok } from '@/lib/calendar/document';
 import { holidays } from '@/lib/calendar/holidays';
-import { MOON_NAMES, type MoonPhase, moonPhases } from '@/lib/calendar/moon';
+import { MOON_NAMES, type MoonPhase, moonPhases, TIDE_NAMES, type TideKind, tideDays } from '@/lib/calendar/moon';
 import type { RenderCtx } from '@/lib/calendar/render';
 import type { CalEl, Page } from '@/lib/calendar/types';
 import { r1 } from '@/lib/calendar/utils';
@@ -20,6 +20,7 @@ export interface CellView {
   /** The day's photo source (may be a cloud `sb:` one; DayCell resolves it and adds `hasimg`). */
   img: string | null;
   moon?: MoonView;
+  tide?: TideView;
 }
 
 export interface MoonView {
@@ -31,6 +32,13 @@ export interface MoonView {
   size: number;
   color: string;
   textSize: number;
+}
+
+export interface TideView {
+  kind: TideKind;
+  name: string;
+  size: number;
+  color: string;
 }
 
 const H_ALIGN = { left: 'flex-start', center: 'center', right: 'flex-end' } as const;
@@ -109,6 +117,9 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
     size: Math.max(8, Math.round(Math.min(L.cw, L.ch) * 0.22)), color: el.hiColor, textSize: moonText,
   });
 
+  const tides = el.tides ? tideDays(y, m) : {};
+  const tideSize = Math.max(8, Math.round(Math.min(L.cw, L.ch) * 0.2));
+
   const cells: CellView[] = L.cells.map((c, i) => {
     const bord: CSSProperties = ln
       ? { borderBottom: `1px solid ${lc}`, borderRight: c.col < 6 ? `1px solid ${lc}` : undefined }
@@ -141,6 +152,7 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
       labelStyle: { fontSize: L.labelSize, color: el.hiColor },
       img,
       moon: smallOn.has(n) ? smallMoon(smallOn.get(n)!, n) : undefined,
+      tide: tides[n] && { kind: tides[n], name: TIDE_NAMES[tides[n]], size: tideSize, color: el.hiColor },
     };
   });
 

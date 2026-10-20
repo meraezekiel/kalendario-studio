@@ -242,7 +242,7 @@ html,body{margin:0}
 .moon{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25em;font-family:'Poppins',sans-serif;line-height:1;text-transform:uppercase;text-align:center}
 .moon b{font-weight:700;letter-spacing:.02em}
 .moon i{font-style:normal;font-weight:700}
-.moon-sm{position:absolute;top:3px;right:3px;z-index:1;line-height:0}
+.marks{position:absolute;top:3px;right:3px;z-index:1;display:flex;gap:2px;line-height:0}
 .evs-year .ev i{min-width:3.6em;flex:none}
 .evs-year .ev{line-height:1.25}
 /* modal */

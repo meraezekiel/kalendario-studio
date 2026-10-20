@@ -70,8 +70,9 @@ export default function CalendarSection({ el }: { el: CalEl }) {
         </div>
         <CheckField label="Show holiday names in the boxes" {...bind('labels')} />
         <CheckField label="Moon phases" value={!!el.moon} onChange={(v) => bind('moon').onChange(v)} />
+        <CheckField label="Spring & neap tides" value={!!el.tides} onChange={(v) => bind('tides').onChange(v)} />
         <CheckField label="Side calendar (last / next month)" value={!!el.side} onChange={(v) => bind('side').onChange(v)} />
-        <p className="hint">Moon phases fill the empty boxes (Philippine time). Side calendars are skipped when counting months for “Fill the rest of the year”.</p>
+        <p className="hint">Moon phases fill the empty boxes (Philippine time). Tide marks: solid arrows for spring tides (biggest rise and fall), open arrows for neap tides (smallest); times of high and low water depend on the place. Side calendars are skipped when counting months for “Fill the rest of the year”.</p>
       </Section>
       <Section title="Grid & boxes" open={false}>
         <CheckField label="Grid lines" {...bind('lines')} />

@@ -40,6 +40,15 @@ test.describe('Classic business calendar', () => {
     // Inspector: moon phases can be switched off, and the list can show one month.
     await main.click({ position: { x: 5, y: 5 } });
     await page.locator('summary', { hasText: 'Day numbers' }).click();
+    // Spring tides at new and full moon, neap tides at the quarters, each with the day after.
+    await page.getByLabel('Spring & neap tides').check();
+    await expect(main.locator('.tide')).toHaveCount(8);
+    await expect(main.locator('.cell[data-day="17"] .tide')).toHaveAttribute('data-tide', 'spring');
+    await expect(main.locator('.cell[data-day="17"] .moon-sm')).toBeVisible();
+    await expect(main.locator('.cell[data-day="25"] .tide')).toHaveAttribute('data-tide', 'neap');
+    await page.screenshot({ path: 'e2e/shots/39-tides.png' });
+    await page.getByLabel('Spring & neap tides').uncheck();
+    await expect(main.locator('.tide')).toHaveCount(0);
     await page.getByLabel('Moon phases').uncheck();
     await expect(main.locator('.moon-sm')).toHaveCount(0);
     await list.click();

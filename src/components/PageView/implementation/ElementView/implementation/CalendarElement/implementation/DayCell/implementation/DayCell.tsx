@@ -2,6 +2,7 @@
 
 import type { CellView } from '../../useCalendarElementHandler';
 import MoonIcon from './MoonIcon/implementation/MoonIcon';
+import TideIcon from './TideIcon/implementation/TideIcon';
 import { useDayCellHandler } from './useDayCellHandler';
 
 interface Props {
@@ -23,7 +24,14 @@ export default function DayCell({ cell, calId, editing }: Props) {
           <span key="view" className="num" style={cell.numStyle}>{cell.num}</span>
         ))}
       {cell.label && <span className="lbl" style={cell.labelStyle}>{cell.label}</span>}
-      {cell.moon && <MoonIcon moon={cell.moon} />}
+      {cell.moon?.big && <MoonIcon moon={cell.moon} />}
+      {(cell.tide || (cell.moon && !cell.moon.big)) && (
+        // Small marks share the top-right corner, the tide left of the moon.
+        <span className="marks">
+          {cell.tide && <TideIcon tide={cell.tide} />}
+          {cell.moon && !cell.moon.big && <MoonIcon moon={cell.moon} />}
+        </span>
+      )}
     </div>
   );
 }

@@ -57,3 +57,24 @@ export function moonPhases(y: number, m: number, tzHours = 8): MoonEvent[] {
   }
   return out.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
+
+export type TideKind = 'spring' | 'neap';
+export const TIDE_NAMES: Record<TideKind, string> = { spring: 'Spring tide', neap: 'Neap tide' };
+
+/**
+ * Spring tides (the biggest rise and fall) come with the new and full moon, neap tides (the smallest)
+ * with the quarters. They usually peak a day or so after the phase, so the phase day and the next are
+ * marked. This is the same everywhere; the actual high and low times depend on the place.
+ */
+export function tideDays(y: number, m: number, tzHours = 8): Record<number, TideKind> {
+  const out: Record<number, TideKind> = {};
+  const prev = m === 0 ? moonPhases(y - 1, 11, tzHours) : moonPhases(y, m - 1, tzHours);
+  for (const p of [...prev, ...moonPhases(y, m, tzHours)]) {
+    const local = new Date(p.at.getTime() + tzHours * 3600000);
+    for (let i = 0; i < 2; i++) {
+      const d = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + i));
+      if (d.getUTCFullYear() === y && d.getUTCMonth() === m) out[d.getUTCDate()] = p.phase % 2 ? 'neap' : 'spring';
+    }
+  }
+  return out;
+}
