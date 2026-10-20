@@ -9,6 +9,7 @@ import Section from '@/components/Fields/Section/implementation/Section';
 import SegField from '@/components/Fields/SegField/implementation/SegField';
 import SelectField from '@/components/Fields/SelectField/implementation/SelectField';
 import TextField from '@/components/Fields/TextField/implementation/TextField';
+import { TIDE_HI_COLOR, TIDE_LO_COLOR } from '@/lib/calendar/tidePlaces';
 import type { CalEl } from '@/lib/calendar/types';
 import { useCalendarSectionHandler } from './useCalendarSectionHandler';
 
@@ -71,8 +72,15 @@ export default function CalendarSection({ el }: { el: CalEl }) {
         <CheckField label="Show holiday names in the boxes" {...bind('labels')} />
         <CheckField label="Moon phases" value={!!el.moon} onChange={(v) => bind('moon').onChange(v)} />
         <CheckField label="Spring & neap tides" value={!!el.tides} onChange={(v) => bind('tides').onChange(v)} />
+        <SelectField label="High & low tide times" options={h.tideOptions} value={el.tidePlace ?? ''} onChange={h.setTidePlace} />
+        {el.tidePlace && (
+          <div className="g2">
+            <ColorField label="High tide color" value={el.tideHiColor || TIDE_HI_COLOR} onChange={(v) => bind('tideHiColor').onChange(v)} />
+            <ColorField label="Low tide color" value={el.tideLoColor || TIDE_LO_COLOR} onChange={(v) => bind('tideLoColor').onChange(v)} />
+          </div>
+        )}
         <CheckField label="Side calendar (last / next month)" value={!!el.side} onChange={(v) => bind('side').onChange(v)} />
-        <p className="hint">Moon phases fill the empty boxes (Philippine time). Tide marks: solid arrows for spring tides (biggest rise and fall), open arrows for neap tides (smallest); times of high and low water depend on the place. Side calendars are skipped when counting months for “Fill the rest of the year”.</p>
+        <p className="hint">Moon phases fill the empty boxes (Philippine time). Tide marks: solid arrows for spring tides (biggest rise and fall), open arrows for neap tides (smallest); times of high and low water depend on the place, so pick the nearest port and name it in your footnote (times worked out from University of Hawaii Sea Level Center tide gauge records, Philippine time). Side calendars are skipped when counting months for “Fill the rest of the year”.</p>
       </Section>
       <Section title="Grid & boxes" open={false}>
         <CheckField label="Grid lines" {...bind('lines')} />

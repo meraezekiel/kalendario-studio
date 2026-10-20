@@ -6,6 +6,8 @@ import { holidays } from '@/lib/calendar/holidays';
 import { MOON_NAMES, type MoonPhase, moonPhases, TIDE_NAMES, type TideKind, tideDays } from '@/lib/calendar/moon';
 import type { RenderCtx } from '@/lib/calendar/render';
 import type { CalEl, Page } from '@/lib/calendar/types';
+import { clock, tideTurns } from '@/lib/calendar/tide';
+import { TIDE_HI_COLOR, TIDE_LO_COLOR, tidePlace } from '@/lib/calendar/tidePlaces';
 import { r1 } from '@/lib/calendar/utils';
 
 export interface CellView {
@@ -21,6 +23,9 @@ export interface CellView {
   img: string | null;
   moon?: MoonView;
   tide?: TideView;
+  /** High and low water times, in order. */
+  times?: { key: number; text: string; style: CSSProperties }[];
+  timesStyle?: CSSProperties;
 }
 
 export interface MoonView {
@@ -98,7 +103,17 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
   const ln = el.lines && !g, lc = el.lineColor;
   const [ai, jc] = NUM_POS[el.numPos] || NUM_POS.center;
   const pad = el.numPos === 'center' ? '0' : `${Math.round(L.ch * 0.08)}px ${Math.round(L.cw * 0.1)}px`;
-  const numBase: CSSProperties = { fontFamily: `'${el.numFont}',sans-serif`, fontSize: L.numSize, fontWeight: el.numBold ? 700 : 400 };
+
+  // Tide times take the bottom of every box (room for four, so the numbers line up); the numbers shrink only if they must.
+  const place = tidePlace(el.tidePlace);
+  const turns = place ? tideTurns(place, y, m) : {};
+  const hiColor = el.tideHiColor || TIDE_HI_COLOR, loColor = el.tideLoColor || TIDE_LO_COLOR;
+  const timesSize = r1(Math.max(5, L.labelSize * 0.9));
+  const timesH = place ? Math.ceil(4 * timesSize * 1.1 + 5) : 0;
+  const fitNum = (footH: number) => (footH ? Math.min(L.numSize, Math.round((L.ch - footH) * 0.85)) : L.numSize);
+  /** A holiday name above the times needs room too; a rough line count (bold capitals are about 0.7em wide). */
+  const footFor = (lbl: string) => timesH + (lbl ? Math.min(3, Math.ceil((lbl.length * L.labelSize * 0.7) / (L.cw - 6))) * L.labelSize * 1.08 + 2 : 0);
+  const numBase: CSSProperties = { fontFamily: `'${el.numFont}',sans-serif`, fontSize: fitNum(timesH), fontWeight: el.numBold ? 700 : 400 };
 
   // Moon phases go into the empty boxes in order; any that don't fit mark their own day instead.
   const phases = el.moon ? moonPhases(y, m) : [];
@@ -118,6 +133,7 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
   });
 
   const tides = el.tides ? tideDays(y, m) : {};
+  const timesStyle: CSSProperties = { fontSize: timesSize };
   const tideSize = Math.max(8, Math.round(Math.min(L.cw, L.ch) * 0.2));
 
   const cells: CellView[] = L.cells.map((c, i) => {
@@ -141,17 +157,21 @@ export function useCalendarElementHandler(el: CalEl, page: Page, ctx: RenderCtx,
     const lbl = info.label || (el.labels ? h : '');
     const img = info.img && ctx.assets[info.img] ? ctx.assets[info.img].src : null;
     const dsel = ctx.edit && selDay === n;
+    const label = lbl && L.ch > 22 ? lbl : '';
+    const footH = place ? footFor(label) : 0;
     return {
       key: i,
       day: n,
       className: `cell${dsel ? ' dsel' : ''}`,
-      style: { ...bord, ...rad, background: info.bg || el.cellBg, ...align },
+      style: { ...bord, ...rad, background: info.bg || el.cellBg, ...align, ...(footH ? { paddingBottom: footH } : {}) },
       num: info.num ?? String(n),
-      numStyle: { ...numBase, color: hi ? el.hiColor : el.numColor },
-      label: lbl && L.ch > 22 ? lbl : '',
+      numStyle: { ...numBase, fontSize: fitNum(footH), color: hi ? el.hiColor : el.numColor },
+      label,
       labelStyle: { fontSize: L.labelSize, color: el.hiColor },
       img,
       moon: smallOn.has(n) ? smallMoon(smallOn.get(n)!, n) : undefined,
+      times: turns[n]?.map((t, k) => ({ key: k, text: `${t.high ? 'H' : 'L'} ${clock(t.min)}`, style: { color: t.high ? hiColor : loColor } })),
+      timesStyle,
       tide: tides[n] && { kind: tides[n], name: TIDE_NAMES[tides[n]], size: tideSize, color: el.hiColor },
     };
   });

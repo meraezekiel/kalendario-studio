@@ -23,7 +23,17 @@ export default function DayCell({ cell, calId, editing }: Props) {
         ) : (
           <span key="view" className="num" style={cell.numStyle}>{cell.num}</span>
         ))}
-      {cell.label && <span className="lbl" style={cell.labelStyle}>{cell.label}</span>}
+      {cell.times ? (
+        // The holiday name sits above the tide times at the bottom of the box.
+        <div className="foot">
+          {cell.label && <span className="lbl" style={cell.labelStyle}>{cell.label}</span>}
+          <div className="times" style={cell.timesStyle}>
+            {cell.times.map((t) => <span key={t.key} style={t.style}>{t.text}</span>)}
+          </div>
+        </div>
+      ) : (
+        cell.label && <span className="lbl" style={cell.labelStyle}>{cell.label}</span>
+      )}
       {cell.moon?.big && <MoonIcon moon={cell.moon} />}
       {(cell.tide || (cell.moon && !cell.moon.big)) && (
         // Small marks share the top-right corner, the tide left of the moon.

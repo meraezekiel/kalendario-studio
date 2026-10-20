@@ -12,7 +12,8 @@
     "db:push": "supabase db push",
     "e2e": "playwright test",
     "graphics": "node scripts/build-graphics.mjs && node scripts/build-peeps.mjs",
-    "social": "node scripts/build-social.mjs"
+    "social": "node scripts/build-social.mjs",
+    "tides": "node scripts/build-tides.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

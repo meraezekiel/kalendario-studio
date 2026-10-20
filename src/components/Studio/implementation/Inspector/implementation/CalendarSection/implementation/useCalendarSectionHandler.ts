@@ -1,5 +1,6 @@
 import { DS } from '@/lib/calendar/constants';
 import { monthOffsetOptions } from '@/lib/calendar/names';
+import { TIDE_PLACES } from '@/lib/calendar/tidePlaces';
 import type { CalEl } from '@/lib/calendar/types';
 import { curPage, updateEl, useStudioStore } from '@/store/useStudioStore';
 import { useBindHandler } from '../../handler/useBindHandler';
@@ -12,6 +13,8 @@ export function useCalendarSectionHandler(el: CalEl) {
   return {
     bind,
     moOptions,
+    tideOptions: [['', 'Off'], ...TIDE_PLACES.map((p) => [p.id, p.name] as const)] as const,
+    setTidePlace: (id: string) => updateEl<CalEl>(el.id, { tidePlace: id || undefined }),
     weekdays: DS.map((d, i) => ({ i, label: d.slice(0, 2), on: el.hiDays.includes(i) })),
     toggleHiDay: (d: number) =>
       updateEl<CalEl>(el.id, { hiDays: el.hiDays.includes(d) ? el.hiDays.filter((x) => x !== d) : [...el.hiDays, d] }),

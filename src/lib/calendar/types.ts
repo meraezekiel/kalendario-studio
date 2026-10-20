@@ -110,6 +110,10 @@ export interface CalEl extends BaseEl {
   moon?: boolean;
   /** Marks spring tides (new and full moon) and neap tides (quarter moons) with a small icon on their days. */
   tides?: boolean;
+  /** Shows each day's high and low water times for this port (an id from tideStations.json). */
+  tidePlace?: string;
+  tideHiColor?: string;
+  tideLoColor?: string;
   /** A small side calendar (e.g. last or next month); not counted when filling the year. */
   side?: boolean;
   days: Record<number, DayInfo>;
