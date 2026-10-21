@@ -82,4 +82,39 @@ describe('sign-up approval', () => {
     expect((await admin.auth.admin.getUserById(waiting.id)).data.user).toBeNull();
     expect(await account(waiting.id)).toBeNull();
   });
+
+  it('lists every account for the admin only, with designs and photo space', async () => {
+    const c = await as(boss);
+    const { data, error } = await c.rpc('admin_accounts');
+    expect(error).toBeNull();
+    const rows = data as { user_id: string; email: string; admin: boolean; designs: number; photo_bytes: number }[];
+    expect(rows.find((r) => r.user_id === boss.id)).toMatchObject({ email: boss.email, admin: true });
+    expect(rows.find((r) => r.user_id === member.id)?.designs).toBeGreaterThanOrEqual(1);
+    expect(rows.find((r) => r.user_id === member.id)?.photo_bytes).toBe(0);
+    expect((await (await as(member)).rpc('admin_accounts')).error?.code).toBe('42501');
+  });
+
+  it('deactivates an account: signed out, data kept but refused, and it can be activated again', async () => {
+    const u = await makeUser();
+    const uc = await as(u);
+    const { data: d } = await uc.from('designs').insert({ name: 'Keep me' }).select('id').single();
+    const c = await as(boss);
+    expect((await c.rpc('deactivate_account', { u: boss.id })).error).toBeNull();
+    expect(await account(boss.id)).toMatchObject({ admin: true });
+    expect((await account(boss.id))?.approved_at).not.toBeNull();
+
+    expect((await c.rpc('deactivate_account', { u: u.id })).error).toBeNull();
+    expect((await account(u.id))?.approved_at).toBeNull();
+    expect((await uc.from('designs').select('id').eq('id', d!.id)).data).toEqual([]);
+    // Every session ended: the refresh token no longer works.
+    expect((await uc.auth.refreshSession()).error).not.toBeNull();
+    // Declining would delete its designs, so it isn't allowed for a deactivated account.
+    expect((await c.rpc('decline_account', { u: u.id })).error).toBeNull();
+    expect((await admin.auth.admin.getUserById(u.id)).data.user).not.toBeNull();
+
+    expect((await c.rpc('approve_account', { u: u.id })).error).toBeNull();
+    const again = await admin.from('designs').select('id').eq('owner', u.id);
+    expect(again.data).toEqual([{ id: d!.id }]);
+    expect((await account(u.id))?.approved_at).not.toBeNull();
+  });
 });

@@ -30,6 +30,11 @@ export default function AccountMenu() {
           <Link className="acct-item" role="menuitem" href="/designs">
             My designs
           </Link>
+          {h.admin && (
+            <Link className="acct-item" role="menuitem" href="/admin">
+              {h.waiting ? `Accounts (${h.waiting} waiting)` : 'Accounts'}
+            </Link>
+          )}
           <button className="acct-item" role="menuitem" onClick={h.signOut}>
             Sign out
           </button>

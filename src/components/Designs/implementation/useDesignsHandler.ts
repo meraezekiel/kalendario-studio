@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { approveAccount, declineAccount, listRequests, type SignUpRequest } from '@/lib/cloud/approval';
 import { createDesign, type DesignRow, listMine, listShared, removeDesign, renameDesign } from '@/lib/cloud/designs';
 import { markClean } from '@/lib/cloud/dirty';
 import { DESIGNS_FULL, MAX_DESIGNS } from '@/lib/cloud/limits';
@@ -9,9 +8,9 @@ import { CloudError } from '@/lib/cloud/transport';
 import { useAuthStore } from '@/store/useAuthStore';
 import { freshDoc } from '@/store/useStudioStore';
 
-export type DesignsTab = 'mine' | 'shared' | 'requests';
+export type DesignsTab = 'mine' | 'shared';
 
-const TABS: { id: DesignsTab; label: string }[] = [
+export const TABS: { id: DesignsTab; label: string }[] = [
   { id: 'mine', label: 'My designs' },
   { id: 'shared', label: 'Shared with me' },
 ];
@@ -21,14 +20,11 @@ export function useDesignsHandler() {
   const router = useRouter();
   const userId = useAuthStore((s) => s.user?.id ?? null);
   const authReady = useAuthStore((s) => s.ready);
-  const admin = useAuthStore((s) => s.admin);
   const [tab, setTab] = useState<DesignsTab>('mine');
   const [mine, setMine] = useState<DesignRow[] | null>(null);
   const [shared, setShared] = useState<DesignRow[] | null>(null);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
-  /** The admin's sign-ups waiting for approval. */
-  const [requests, setRequests] = useState<SignUpRequest[] | null>(null);
 
   useEffect(() => useAuthStore.getState().init(), []);
 
@@ -53,34 +49,6 @@ export function useDesignsHandler() {
     }
     void load();
   }, [authReady, userId, router, load]);
-
-  useEffect(() => {
-    if (!admin) return setRequests(null);
-    listRequests().then(setRequests, () => {
-      setError('Could not load the sign-up requests. Check your connection and try again.');
-      setRequests((v) => v ?? []);
-    });
-  }, [admin, userId]);
-
-  const approve = async (id: string) => {
-    setError('');
-    try {
-      await approveAccount(id);
-      setRequests((list) => list?.filter((r) => r.user_id !== id) ?? null);
-    } catch {
-      setError('Could not approve that account. Please try again.');
-    }
-  };
-
-  const decline = async (id: string) => {
-    setError('');
-    try {
-      await declineAccount(id);
-      setRequests((list) => list?.filter((r) => r.user_id !== id) ?? null);
-    } catch {
-      setError('Could not decline that account. Please try again.');
-    }
-  };
 
   const create = async () => {
     if (creating) return;
@@ -121,18 +89,14 @@ export function useDesignsHandler() {
     }
   };
 
-  const list = tab === 'mine' ? mine : tab === 'shared' ? shared : requests;
+  const list = tab === 'mine' ? mine : shared;
   return {
     enabled: cloudEnabled(),
     signedIn: !!userId,
-    tabs: admin ? [...TABS, { id: 'requests' as const, label: requests?.length ? `Sign-ups (${requests.length})` : 'Sign-ups' }] : TABS,
     tab,
     setTab,
-    list: tab === 'requests' ? null : (list as DesignRow[] | null),
+    list,
     loading: list === null,
-    requests: tab === 'requests' ? (requests ?? []) : null,
-    approve,
-    decline,
     empty: tab === 'mine' ? 'No designs yet. Start one with New design.' : 'Nothing has been shared with you yet.',
     error,
     creating,

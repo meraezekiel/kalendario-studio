@@ -11,8 +11,11 @@ import { usePhotoUrlStore } from './usePhotoUrlStore';
 
 export type AuthUser = { id: string; email: string; name: string };
 
-/** Shown on the sign-in page to an account the admin hasn't approved yet. */
-export const WAITING_TEXT = 'Your account is waiting for approval. You can sign in once it has been approved.';
+/** Shown on the sign-in page to an account the admin hasn't let in. */
+export const WAITING_TEXT = {
+  pending: 'Your account is waiting for approval. You can sign in once it has been approved.',
+  deactivated: 'Your account has been deactivated. Please contact the site owner.',
+} as const;
 
 /** Where a fresh sign-in lands. */
 export const AFTER_SIGN_IN = '/designs';
@@ -28,8 +31,8 @@ interface AuthState {
   ready: boolean;
   /** The signed-in account may approve sign-ups. */
   admin: boolean;
-  /** Email of an account just turned away because it is waiting for approval (the sign-in page says so). */
-  waiting: string | null;
+  /** Why an account was just turned away (the sign-in page says so): new and waiting, or deactivated. */
+  waiting: keyof typeof WAITING_TEXT | null;
   init(): void;
   signUp(email: string, password: string, name: string): Promise<'check-email'>;
   signIn(email: string, password: string): Promise<void>;
@@ -113,15 +116,15 @@ function check(id: string): Promise<Approval> {
 const known = new Map<string, Approval>();
 
 export const useAuthStore = create<AuthState>((set, get) => {
-  /** Lets a session in once its account is approved; a waiting one is signed out here and named in `waiting`. */
+  /** Lets a session in once its account is approved; any other is signed out here, with the reason in `waiting`. */
   async function admit(user: AuthUser) {
     const a = await check(user.id);
     known.set(user.id, a);
     // Signed out or switched account meanwhile.
     const { data } = await supabase().auth.getSession();
     if (data.session?.user.id !== user.id) return;
-    if (a.state === 'pending') {
-      set({ waiting: user.email });
+    if (a.state === 'pending' || a.state === 'deactivated') {
+      set({ waiting: a.state });
       await supabase().auth.signOut({ scope: 'local' }).catch(() => {});
       set({ user: null, admin: false, ready: true });
       return;

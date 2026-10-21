@@ -86,8 +86,8 @@ export function useAuthHandler() {
     busy,
     error,
     sent,
-    /** An account waiting for approval tried to sign in (here, or from an email link or Google). */
-    waiting: waiting ? WAITING_TEXT : '',
+    /** An account not let in tried to sign in (here, or from an email link or Google). */
+    waiting: waiting ? WAITING_TEXT[waiting] : '',
     submit,
     google,
   };

@@ -5,6 +5,7 @@ test.skip(!cloudConfigured, 'needs the TEST Supabase project (.env.test.local)')
 test.afterAll(cleanupUsers);
 
 const WAITING = 'Your account is waiting for approval. You can sign in once it has been approved.';
+const DEACTIVATED = 'Your account has been deactivated. Please contact the site owner.';
 
 async function tryToSignIn(page: Page, user: { email: string; password: string }) {
   await page.goto('/login');
@@ -13,7 +14,19 @@ async function tryToSignIn(page: Page, user: { email: string; password: string }
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
-test('a new account waits until the admin approves it', async ({ page, browser }) => {
+/** Signs in as a fresh admin and opens the dashboard from the account menu. */
+async function openDashboard(page: Page) {
+  const boss = await newUser('Boss');
+  await setAccount(boss.id, { admin: true });
+  await signIn(page, boss);
+  await page.getByRole('button', { name: 'Account' }).click();
+  await page.getByRole('menuitem', { name: /^Accounts \(\d+ waiting\)$/ }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole('heading', { name: 'Accounts' })).toBeVisible();
+  return boss;
+}
+
+test('a new account waits until the admin activates it, and can be deactivated again', async ({ page, browser }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const ana = await newUser('Ana Waiting', { approved: false });
@@ -24,45 +37,59 @@ test('a new account waits until the admin approves it', async ({ page, browser }
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Account' })).toHaveCount(0);
-  await page.goto('/designs');
-  await expect(page).toHaveURL(/\/login\?next=/);
 
-  // The admin sees Ana under Sign-ups and approves her.
-  const boss = await newUser('Boss');
-  await setAccount(boss.id, { admin: true });
+  // The admin activates Ana from the dashboard.
   const ctx = await browser.newContext();
-  const adminPage = await ctx.newPage();
-  await signIn(adminPage, boss);
-  await adminPage.goto('/designs');
-  const tab = adminPage.getByRole('tab', { name: /^Sign-ups \(\d+\)$/ });
-  await tab.click();
-  const row = adminPage.locator(`.request[data-email="${ana.email}"]`);
+  const admin = await ctx.newPage();
+  const boss = await openDashboard(admin);
+  const row = admin.locator(`.account[data-email="${ana.email}"]`);
   await expect(row).toContainText('Ana Waiting');
-  await expect(row).toContainText('Signed up just now');
-  await adminPage.screenshot({ path: 'e2e/shots/48-sign-ups.png' });
-  await row.getByRole('button', { name: 'Approve' }).click();
-  await expect(row).toHaveCount(0);
-  await ctx.close();
+  await expect(row.locator('.account-status')).toHaveText('Waiting');
+  // Her turned-away try still counts as a sign-in.
+  await expect(row).toContainText('Signed up just now · Last sign-in just now · 0 designs · 0 MB of photos');
+  const me = admin.locator(`.account[data-email="${boss.email}"]`);
+  await expect(me.locator('.account-status')).toHaveText('Admin');
+  await expect(me.getByRole('button')).toHaveCount(0);
+  await admin.screenshot({ path: 'e2e/shots/48-accounts.png' });
+  await row.getByRole('button', { name: 'Activate' }).click();
+  await expect(row.locator('.account-status')).toHaveText('Active');
 
   await tryToSignIn(page, ana);
   await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
   await expect(page).toHaveURL(/\/designs/);
-  // Only the admin has the Sign-ups tab.
-  await expect(page.getByRole('tab', { name: 'My designs' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: /Sign-ups/ })).toHaveCount(0);
-  await page.getByRole('button', { name: 'New design' }).click();
-  await page.waitForURL(/\/d\/[0-9a-f-]{36}$/);
+  // Only the admin has the dashboard.
+  await page.getByRole('button', { name: 'Account' }).click();
+  await expect(page.getByRole('menuitem', { name: /Accounts/ })).toHaveCount(0);
+  await page.goto('/admin');
+  await expect(page.getByText('This page is for the site admin.')).toBeVisible();
+
+  // Deactivated: on her next visit she is signed out and told so.
+  await admin.reload();
+  await row.getByRole('button', { name: 'Deactivate' }).click();
+  await row.getByRole('button', { name: 'Click again to deactivate' }).click();
+  await expect(row.locator('.account-status')).toHaveText('Deactivated');
+  await page.goto('/designs');
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByRole('status')).toHaveText(DEACTIVATED);
+  await tryToSignIn(page, ana);
+  await expect(page.getByRole('status')).toHaveText(DEACTIVATED);
+  // A deactivated account can be activated again, never declined (that would delete its designs).
+  await expect(row.getByRole('button', { name: 'Decline' })).toHaveCount(0);
+  await row.getByRole('button', { name: 'Activate' }).click();
+  await expect(row.locator('.account-status')).toHaveText('Active');
+  await ctx.close();
   expect(errors).toEqual([]);
 });
 
 test('the admin can decline a sign-up, which removes the account', async ({ page }) => {
   const spam = await newUser('Spammer', { approved: false });
-  const boss = await newUser('Boss');
-  await setAccount(boss.id, { admin: true });
-  await signIn(page, boss);
-  await page.goto('/designs');
-  await page.getByRole('tab', { name: /^Sign-ups/ }).click();
-  const row = page.locator(`.request[data-email="${spam.email}"]`);
+  await openDashboard(page);
+  const row = page.locator(`.account[data-email="${spam.email}"]`);
+  // Fits a phone: no sideways scrolling, buttons still in reach.
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect(row.getByRole('button', { name: 'Decline' })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'e2e/shots/49-accounts-phone.png' });
   await row.getByRole('button', { name: 'Decline' }).click();
   await expect(row.getByRole('button', { name: 'Click again to decline' })).toBeVisible();
   expect(await userExists(spam.id)).toBe(true);

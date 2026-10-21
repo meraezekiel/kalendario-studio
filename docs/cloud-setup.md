@@ -110,8 +110,11 @@ Next.js needs no `vercel.json`.
 
 New accounts can't use the cloud until you approve them. This protects the free plan's storage. After confirming their email, someone who signs in sees "Your account is waiting for approval" and stays signed out. The database also refuses anything they try to store.
 
-- The accounts that existed when the approval migration ran were approved automatically. The oldest of them became the admin.
-- As the admin, open **My designs > Sign-ups**. **Approve** lets the person in. **Decline** (click twice) deletes the waiting account, and that email can sign up again.
+- The accounts that existed when the approval migrations ran were approved automatically. `androidantoque@gmail.com` is the admin (or, if that account doesn't exist, the oldest account).
+- As the admin, open the account menu and choose **Accounts** (it shows how many are waiting), or go to `/admin`. Every account is listed with its status, last sign-in, designs and photo space used.
+  - **Activate** lets a waiting or deactivated account in.
+  - **Deactivate** (click twice) turns an account off and signs it out everywhere. Its designs and photos stay, so activating it again brings them back.
+  - **Decline** (click twice, waiting accounts only) deletes the account, and that email can sign up again.
 - To make someone else an admin, run `update public.accounts set admin = true where email = '<their email>';` in the SQL Editor.
 
 ## 9. Keeping it running

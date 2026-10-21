@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { listAccounts } from '@/lib/cloud/approval';
 import { megabytes, PHOTO_SPACE_BYTES } from '@/lib/cloud/limits';
 import { photoUsage } from '@/lib/cloud/photos';
 import { cloudEnabled } from '@/lib/cloud/supabase';
@@ -12,6 +13,7 @@ export function useAccountMenuHandler() {
   const goHome = useGoHome();
   const user = useAuthStore((s) => s.user);
   const ready = useAuthStore((s) => s.ready);
+  const admin = useAuthStore((s) => s.admin);
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
@@ -30,6 +32,20 @@ export function useAccountMenuHandler() {
       live = false;
     };
   }, [open, user]);
+
+  // For the admin: how many sign-ups are waiting, fetched fresh each time the menu opens.
+  const [waiting, setWaiting] = useState(0);
+  useEffect(() => {
+    if (!open || !admin) return;
+    let live = true;
+    listAccounts().then(
+      (list) => live && setWaiting(list.filter((a) => !a.approved_at && !a.deactivated_at).length),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [open, admin]);
 
   // Close on a click outside or Escape.
   useEffect(() => {
@@ -58,6 +74,8 @@ export function useAccountMenuHandler() {
     enabled: cloudEnabled(),
     ready,
     user,
+    admin,
+    waiting,
     initial: (user?.name || user?.email || '?').charAt(0).toUpperCase(),
     open,
     usage: used == null ? null : `${mb(used)} MB of ${megabytes(PHOTO_SPACE_BYTES)} used`,
