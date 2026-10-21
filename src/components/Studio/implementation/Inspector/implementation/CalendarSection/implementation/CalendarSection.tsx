@@ -86,7 +86,7 @@ export default function CalendarSection({ el }: { el: CalEl }) {
         )}
         <CheckField label="Moon phases" value={!!el.moon} onChange={(v) => bind('moon').onChange(v)} />
         <CheckField label="Spring & neap tides" value={!!el.tides} onChange={(v) => bind('tides').onChange(v)} />
-        <p className="hint">Pick the port nearest you: high tides run along the top of each box, low tides along the bottom (morning left, afternoon right), in Philippine time. Heights are metres above the average lowest tide of the day, as in Philippine tide tables; a minus means an extra-low tide. Name the port in your footnote. Times come from University of Hawaii Sea Level Center tide gauge records. Moon phases fill the empty boxes. Spring & neap marks: solid arrows for the biggest tides, open arrows for the smallest.</p>
+        <p className="hint">Pick the port nearest you: high tides run along the top of each box, low tides along the bottom (morning left, afternoon right), in Philippine time. Heights are metres above the average lowest tide of the day, as in Philippine tide tables; a minus means an extra-low tide. Name the place in your footnote. Ports with a tide gauge (Manila, Subic, Lubang, Currimao, Legazpi, Cebu City, Puerto Princesa, Davao City, Jolo) use its records (University of Hawaii Sea Level Center) and are usually within 5–15 minutes; other towns use the EOT20 tide model (DGFI-TUM, CC BY 4.0) and are usually within 10–20 minutes and 15 cm. Moon phases fill the empty boxes. Spring & neap marks: solid arrows for the biggest tides, open arrows for the smallest.</p>
       </Section>
       <Section title="Grid & boxes" open={false}>
         <CheckField label="Grid lines" {...bind('lines')} />

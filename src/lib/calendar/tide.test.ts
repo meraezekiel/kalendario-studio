@@ -50,6 +50,25 @@ describe('tideTurns', () => {
     expect(off[off.length - 1]).toBeLessThan(45);
   });
 
+  it('uses the standard phase convention, so gauge ports and model towns nearby agree', () => {
+    // Fitted gauge constants and EOT20 model constants only line up if diurnal phases follow Schureman.
+    for (const [gauge, town] of [['cebu', 'danao'], ['davao', 'mati'], ['manila', 'mariveles']]) {
+      const a = tidePlace(gauge)!.c, b = tidePlace(town)!.c;
+      for (const k of ['M2', 'S2', 'K1', 'O1']) {
+        const d = Math.abs(((((b[k][1] - a[k][1]) % 360) + 540) % 360) - 180);
+        expect(d, `${gauge}/${town} ${k}`).toBeLessThan(25);
+      }
+    }
+  });
+
+  it('covers Negros on both coasts', () => {
+    for (const id of ['bacolod', 'silay', 'cadiz', 'san-carlos', 'dumaguete', 'bais', 'bayawan', 'sipalay']) {
+      const st = tidePlace(id)!;
+      expect(st.name).toMatch(/Negros (Occidental|Oriental)$/);
+      expect(Object.keys(tideTurns(st, 2027, 0)).length).toBeGreaterThanOrEqual(29);
+    }
+  });
+
   it('measures heights from mean lower low water: most lows near zero, some a little below', () => {
     for (const st of TIDE_PLACES) {
       const lows = Object.values(tideTurns(st, 2027, 0)).flat().filter((t) => !t.high).map((t) => t.h - st.datum);

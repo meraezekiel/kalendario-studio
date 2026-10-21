@@ -3,30 +3,30 @@
 // and writes src/lib/calendar/tideStations.json. Run with: npm run tides
 //   npm run tides -- --check   also fits on older years and reports how well it predicts later ones.
 import { writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { args, CONSTITUENTS, tideHeight, tideTurns } from '../src/lib/calendar/tide.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const check = process.argv.includes('--check');
 
-/** UHSLC id + version letter, and the name shown in the studio. */
-const STATIONS = [
-  ['370a', 'manila', 'Manila'],
-  ['382a', 'subic', 'Subic Bay'],
-  ['655a', 'lubang', 'Lubang'],
-  ['654a', 'currimao', 'Currimao, Ilocos Norte'],
-  ['371a', 'legazpi', 'Legazpi'],
-  ['379a', 'cebu', 'Cebu'],
-  ['380a', 'puerto-princesa', 'Puerto Princesa'],
-  ['372b', 'davao', 'Davao'],
-  ['373a', 'jolo', 'Jolo'],
+/** UHSLC id + version letter, the name shown in the studio, and the gauge's latitude and longitude. */
+export const STATIONS = [
+  ['370a', 'manila', 'Manila', 14.582, 120.972],
+  ['382a', 'subic', 'Subic Bay, Zambales', 14.765, 120.252],
+  ['655a', 'lubang', 'Lubang, Occidental Mindoro', 13.818, 120.202],
+  ['654a', 'currimao', 'Currimao, Ilocos Norte', 17.988, 120.488],
+  ['371a', 'legazpi', 'Legazpi, Albay', 13.145, 123.757],
+  ['379a', 'cebu', 'Cebu City', 10.3, 123.917],
+  ['380a', 'puerto-princesa', 'Puerto Princesa, Palawan', 9.75, 118.733],
+  ['372b', 'davao', 'Davao City', 7.154, 125.663],
+  ['373a', 'jolo', 'Jolo, Sulu', 6.067, 121],
 ];
 /** Years of records to fit: enough to separate K1 from P1 and S2 from T2, and to average out the weather. */
 const FIT_YEARS = 4;
 const NAMES = Object.keys(CONSTITUENTS);
 
-async function records(id) {
+export async function records(id) {
   const res = await fetch(`https://uhslc.soest.hawaii.edu/data/csv/rqds/pacific/hourly/h${id}.csv`);
   if (!res.ok) throw new Error(`UHSLC ${id}: HTTP ${res.status}`);
   const out = [];
@@ -99,32 +99,50 @@ function quadratic(pts) {
   return solve(A, r);
 }
 
-const YEAR = 365.25 * 86400000;
-const between = (obs, from, to) => obs.filter(([t]) => t >= from && t < to);
+export const YEAR = 365.25 * 86400000;
+export const between = (obs, from, to) => obs.filter(([t]) => t >= from && t < to);
 
 /**
  * Mean lower low water: the average of each day's lowest tide over a 19-year lunar node cycle, the level
  * Philippine (NAMRIA) tide tables measure heights from. In the same units and reference as z0.
  */
-function mllw(st) {
+export function mllw(st) {
+  // Each month: node factors and arguments once, then every angle advances at its constituent's steady speed.
+  const names = Object.keys(st.c);
+  const speed = names.map((n) => CONSTITUENTS[n][0].reduce((w, d, i) => w + d * RATES[i], 0) * (Math.PI / 180));
+  const step = 0.25; // hours
   let sum = 0, n = 0;
   for (let y = 2016; y < 2035; y++) {
     for (let m = 0; m < 12; m++) {
-      for (const turns of Object.values(tideTurns(st, y, m))) {
-        const lows = turns.filter((t) => !t.high).map((t) => t.h);
-        if (lows.length) { sum += Math.min(...lows); n++; }
+      const t0 = Date.UTC(y, m, 1) - 8 * 3600000, hours = (Date.UTC(y, m + 1, 1) - Date.UTC(y, m, 1)) / 3600000;
+      const fa = args(names, t0);
+      const z = (h) => names.reduce((s, name, i) => s + fa[i][0] * st.c[name][0] * Math.cos(fa[i][1] + speed[i] * h - st.c[name][1] * (Math.PI / 180)), st.z0);
+      const lowest = new Map();
+      let a = z(-step), b = z(0);
+      for (let h = 0; h < hours; h += step) {
+        const c = z(h + step);
+        if (b < a && b <= c) {
+          const off = (0.5 * (a - c)) / (a - 2 * b + c), low = b - 0.25 * (a - c) * off;
+          const day = Math.floor((h + off * step) / 24);
+          if (!lowest.has(day) || low < lowest.get(day)) lowest.set(day, low);
+        }
+        [a, b] = [b, c];
       }
+      for (const low of lowest.values()) { sum += low; n++; }
     }
   }
   return Math.round((sum / n) * 1e4) / 1e4;
 }
+
+/** Degrees per hour of τ, s, h, p and p1. */
+const RATES = [14.49205212, 0.54901653, 0.04106864, 0.00464183, 0.00000196];
 
 /**
  * RMS height error, how far off the predicted times of high and low water are (minutes, median and
  * 90th percentile), and how far off their heights are once the year's mean level is matched (the gauge's
  * zero and the sea level drift over the years; the printed heights are measured from MLLW instead).
  */
-function score(st, obs) {
+export function score(st, obs) {
   let se = 0, offset = 0;
   for (const [t, z] of obs) {
     const p = tideHeight(st, t);
@@ -159,6 +177,10 @@ function score(st, obs) {
     + `heights median ${q(hdiffs, 0.5)} cm off, 90% within ${q(hdiffs, 0.9)} cm, ${missed} of ${missed + diffs.length} not seen by the gauge`;
 }
 
+// Only when run directly: build-tide-towns.mjs imports the helpers above.
+if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) await main();
+
+async function main() {
 const out = [];
 for (const [code, id, name] of STATIONS) {
   const obs = await records(code);
@@ -181,3 +203,4 @@ for (const [code, id, name] of STATIONS) {
 }
 writeFileSync(join(root, 'src/lib/calendar/tideStations.json'), `[\n${out.map((s) => JSON.stringify(s)).join(',\n')}\n]\n`);
 console.log('Wrote src/lib/calendar/tideStations.json');
+}

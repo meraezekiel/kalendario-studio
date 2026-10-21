@@ -18,7 +18,10 @@ export interface TideStation {
 
 type Nodal = 'none' | 'M2' | 'K1' | 'O1' | 'K2' | 'Mf' | 'Mm' | 'M2^2' | 'M2^3' | 'M2K1';
 
-/** Doodson multipliers of (τ, s, h, p, p1), a fixed phase in degrees, and how the 18.6-year lunar node cycle affects it. */
+/**
+ * Doodson multipliers of (τ, s, h, p, p1), a fixed phase in degrees (Schureman's convention, as official tables and
+ * global tide models use, so their phase lags can be used as they are), and how the 18.6-year lunar node cycle affects it.
+ */
 export const CONSTITUENTS: Record<string, [number[], number, Nodal]> = {
   M2: [[2, 0, 0, 0, 0], 0, 'M2'],
   S2: [[2, 2, -2, 0, 0], 0, 'none'],
@@ -29,19 +32,19 @@ export const CONSTITUENTS: Record<string, [number[], number, Nodal]> = {
   NU2: [[2, -1, 2, -1, 0], 0, 'M2'],
   L2: [[2, 1, 0, -1, 0], 180, 'M2'],
   T2: [[2, 2, -3, 0, 1], 0, 'none'],
-  K1: [[1, 1, 0, 0, 0], 90, 'K1'],
-  O1: [[1, -1, 0, 0, 0], -90, 'O1'],
-  P1: [[1, 1, -2, 0, 0], -90, 'none'],
+  K1: [[1, 1, 0, 0, 0], -90, 'K1'],
+  O1: [[1, -1, 0, 0, 0], 90, 'O1'],
+  P1: [[1, 1, -2, 0, 0], 90, 'none'],
   S1: [[1, 1, -1, 0, 0], 90, 'none'],
-  Q1: [[1, -2, 0, 1, 0], -90, 'O1'],
-  '2Q1': [[1, -3, 0, 2, 0], -90, 'O1'],
-  RHO1: [[1, -3, 2, 0, 0], -90, 'O1'],
-  J1: [[1, 2, 0, -1, 0], 90, 'K1'],
+  Q1: [[1, -2, 0, 1, 0], 90, 'O1'],
+  '2Q1': [[1, -3, 0, 2, 0], 90, 'O1'],
+  RHO1: [[1, -3, 2, 0, 0], 90, 'O1'],
+  J1: [[1, 2, 0, -1, 0], -90, 'K1'],
   M4: [[4, 0, 0, 0, 0], 0, 'M2^2'],
   MS4: [[4, 2, -2, 0, 0], 0, 'M2'],
   MN4: [[4, -1, 0, 1, 0], 0, 'M2^2'],
   M6: [[6, 0, 0, 0, 0], 0, 'M2^3'],
-  MK3: [[3, 1, 0, 0, 0], 90, 'M2K1'],
+  MK3: [[3, 1, 0, 0, 0], -90, 'M2K1'],
   Mf: [[0, 2, 0, 0, 0], 0, 'Mf'],
   Mm: [[0, 1, 0, -1, 0], 0, 'Mm'],
   Sa: [[0, 0, 1, 0, 0], 0, 'none'],

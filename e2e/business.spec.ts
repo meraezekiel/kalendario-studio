@@ -52,7 +52,7 @@ test.describe('Classic business calendar', () => {
 
     // High and low water times for a chosen port, as on printed calendars: blue highs along the top,
     // red lows along the bottom, morning on the left and afternoon on the right.
-    await page.getByLabel('High & low tide times').selectOption({ label: 'Davao' });
+    await page.getByLabel('High & low tide times').selectOption({ label: 'Davao City' });
     const d15 = main.locator('.cell[data-day="15"]');
     const highs = d15.locator('.tt-high span'), lows = d15.locator('.tt-low span');
     await expect(highs).toHaveText([/^5:26AM \d\.\dM$/, /^5:02PM \d\.\dM$/]);
