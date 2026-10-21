@@ -56,6 +56,7 @@ export default function Auth() {
           )}
           {h.error && <p className="auth-error" role="alert">{h.error}</p>}
           {h.sent && <p className="auth-sent" role="status">{h.sent}</p>}
+          {h.waiting && <p className="auth-sent" role="status">{h.waiting}</p>}
           <button type="submit" className="btn primary auth-wide" disabled={h.busy}>
             {SUBMIT[h.tab]}
           </button>

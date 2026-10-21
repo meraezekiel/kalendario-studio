@@ -7,6 +7,7 @@ import {
   newDesign,
   newUnconfirmedUser,
   newUser,
+  setAccount,
   signIn,
   testEmail,
   type TestUser,
@@ -182,6 +183,7 @@ test('sharing to an email without an account shows Invited; after that email sig
 
   await confirmUser(late.id);
   expect((await memberLinks(id))[email]).toBe(late.id);
+  await setAccount(late.id, { approved_at: new Date().toISOString() }); // the admin lets the new account in
   await a.close();
 
   const ctx = await browser.newContext();

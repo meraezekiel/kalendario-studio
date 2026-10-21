@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import AccountMenu from '@/components/Studio/implementation/AccountMenu/implementation/AccountMenu';
 import DesignCard from './DesignCard/implementation/DesignCard';
-import { TABS, useDesignsHandler } from './useDesignsHandler';
+import SignUpRequests from './SignUpRequests/implementation/SignUpRequests';
+import { useDesignsHandler } from './useDesignsHandler';
 
-/** The /designs page: the account's designs and the ones shared with it. */
+/** The /designs page: the account's designs, the ones shared with it, and (for the admin) sign-ups to approve. */
 export default function Designs() {
   const h = useDesignsHandler();
   if (!h.enabled) {
@@ -29,8 +30,8 @@ export default function Designs() {
       </header>
       <main className="designs-main">
         <div className="designs-head">
-          <div className="seg designs-tabs" role="tablist" aria-label="Designs">
-            {TABS.map((t) => (
+          <div className={`seg designs-tabs${h.tabs.length > 2 ? ' wide' : ''}`} role="tablist" aria-label="Designs">
+            {h.tabs.map((t) => (
               <button key={t.id} type="button" role="tab" aria-selected={h.tab === t.id} className={h.tab === t.id ? 'on' : ''} onClick={() => h.setTab(t.id)}>
                 {t.label}
               </button>
@@ -41,7 +42,9 @@ export default function Designs() {
         </div>
         {h.error && <p className="auth-error" role="alert">{h.error}</p>}
         {h.loading ? (
-          <p className="hint">Loading your designs…</p>
+          <p className="hint">{h.tab === 'requests' ? 'Loading sign-ups…' : 'Loading your designs…'}</p>
+        ) : h.requests ? (
+          <SignUpRequests list={h.requests} onApprove={h.approve} onDecline={h.decline} />
         ) : h.list!.length === 0 ? (
           <p className="hint designs-empty">{h.empty}</p>
         ) : (

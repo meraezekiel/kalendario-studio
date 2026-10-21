@@ -106,7 +106,15 @@ Next.js needs no `vercel.json`.
    (In PowerShell: `$env:BASE_URL="<vercel-url>"; npm run e2e`.) This runs the editor tests against the deployed site. The cloud tests always use the test project on your computer.
 7. Sign up on the live site with your own email, confirm it, and open **My designs** to check everything works end to end.
 
-## 8. Keeping it running
+## 8. Approving sign-ups
+
+New accounts can't use the cloud until you approve them. This protects the free plan's storage. After confirming their email, someone who signs in sees "Your account is waiting for approval" and stays signed out. The database also refuses anything they try to store.
+
+- The accounts that existed when the approval migration ran were approved automatically. The oldest of them became the admin.
+- As the admin, open **My designs > Sign-ups**. **Approve** lets the person in. **Decline** (click twice) deletes the waiting account, and that email can sign up again.
+- To make someone else an admin, run `update public.accounts set admin = true where email = '<their email>';` in the SQL Editor.
+
+## 9. Keeping it running
 
 - The free Supabase plan pauses a project after about a week with no activity. The site then can't sign in or sync (the local editor still works). Restore it from the dashboard with **Restore project**; nothing is lost. Any regular use keeps it awake.
 - When a new file appears in `supabase/migrations`, push it to both projects (steps 2 and 3) before deploying the code that needs it.

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { cloudEnabled } from '@/lib/cloud/supabase';
-import { nextPath, useAuthStore } from '@/store/useAuthStore';
+import { nextPath, useAuthStore, WAITING_TEXT } from '@/store/useAuthStore';
 
 export type AuthTab = 'signin' | 'signup' | 'forgot';
 
@@ -14,6 +14,7 @@ export const TABS: { id: AuthTab; label: string }[] = [
 export function useAuthHandler() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const waiting = useAuthStore((s) => s.waiting);
   const [tab, setTab] = useState<AuthTab>('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -33,6 +34,7 @@ export function useAuthHandler() {
     setTab(t);
     setError('');
     setSent('');
+    useAuthStore.setState({ waiting: null });
   };
 
   const submit = async (e: FormEvent) => {
@@ -41,13 +43,14 @@ export function useAuthHandler() {
     setBusy(true);
     setError('');
     setSent('');
+    useAuthStore.setState({ waiting: null });
     const auth = useAuthStore.getState();
     try {
       if (tab === 'signin') {
         await auth.signIn(email.trim(), password);
       } else if (tab === 'signup') {
         await auth.signUp(email.trim(), password, name);
-        setSent(`Check your email. We sent a link to ${email.trim()} to confirm your account.`);
+        setSent(`Check your email. We sent a link to ${email.trim()} to confirm your account. Then it waits for approval before you can sign in.`);
         setPassword('');
       } else {
         await auth.resetPassword(email.trim());
@@ -83,6 +86,8 @@ export function useAuthHandler() {
     busy,
     error,
     sent,
+    /** An account waiting for approval tried to sign in (here, or from an email link or Google). */
+    waiting: waiting ? WAITING_TEXT : '',
     submit,
     google,
   };

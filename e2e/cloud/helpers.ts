@@ -23,8 +23,8 @@ const made: TestUser[] = [];
 /** A unique throwaway address (never delivered: users are created confirmed). */
 export const testEmail = () => `e2e-${randomUUID()}@example.test`;
 
-/** A confirmed throwaway user in the TEST project; removed by `cleanupUsers()`. */
-export async function newUser(name?: string): Promise<TestUser> {
+/** A confirmed throwaway user in the TEST project, approved unless told otherwise; removed by `cleanupUsers()`. */
+export async function newUser(name?: string, { approved = true } = {}): Promise<TestUser> {
   const email = testEmail();
   const password = `pw-${randomUUID()}`;
   const { data, error } = await admin().auth.admin.createUser({
@@ -36,7 +36,20 @@ export async function newUser(name?: string): Promise<TestUser> {
   if (error) throw error;
   const user = { id: data.user.id, email, password };
   made.push(user);
+  if (approved) await setAccount(user.id, { approved_at: new Date().toISOString() });
   return user;
+}
+
+/** Changes a user's row in public.accounts (approval, admin). */
+export async function setAccount(id: string, fields: { approved_at?: string | null; admin?: boolean }) {
+  const { error } = await admin().from('accounts').update(fields).eq('user_id', id);
+  if (error) throw error;
+}
+
+/** Whether a user still exists in the TEST project. */
+export async function userExists(id: string): Promise<boolean> {
+  const { data } = await admin().auth.admin.getUserById(id);
+  return !!data.user;
 }
 
 /** Deletes every user this worker made (their designs cascade). Call from `test.afterAll`. */
@@ -45,7 +58,7 @@ export async function cleanupUsers() {
   const failed: string[] = [];
   for (const u of users) {
     const { error } = await admin().auth.admin.deleteUser(u.id);
-    if (error) failed.push(`${u.email}: ${error.message}`);
+    if (error && error.status !== 404) failed.push(`${u.email}: ${error.message}`); // 404: a test deleted it
   }
   if (failed.length) throw new Error(`Could not delete test users:\n${failed.join('\n')}`);
 }

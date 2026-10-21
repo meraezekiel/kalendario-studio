@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AuthError, User } from '@supabase/supabase-js';
+import { type Approval, approval } from '@/lib/cloud/approval';
 import { safeNext } from '@/lib/cloud/safeNext';
 import { dirtyDesigns, type DirtyDesign, forgetDirty, isDirty } from '@/lib/cloud/dirty';
 import { forgetLocalCopies } from '@/lib/cloud/localCopies';
@@ -9,6 +10,9 @@ import { useMyTemplatesStore } from './useMyTemplatesStore';
 import { usePhotoUrlStore } from './usePhotoUrlStore';
 
 export type AuthUser = { id: string; email: string; name: string };
+
+/** Shown on the sign-in page to an account the admin hasn't approved yet. */
+export const WAITING_TEXT = 'Your account is waiting for approval. You can sign in once it has been approved.';
 
 /** Where a fresh sign-in lands. */
 export const AFTER_SIGN_IN = '/designs';
@@ -20,8 +24,12 @@ export function nextPath(search: string): string {
 
 interface AuthState {
   user: AuthUser | null;
-  /** True once the stored session (if any) has been read. */
+  /** True once the stored session (if any) has been read and its approval checked. */
   ready: boolean;
+  /** The signed-in account may approve sign-ups. */
+  admin: boolean;
+  /** Email of an account just turned away because it is waiting for approval (the sign-in page says so). */
+  waiting: string | null;
   init(): void;
   signUp(email: string, password: string, name: string): Promise<'check-email'>;
   signIn(email: string, password: string): Promise<void>;
@@ -91,89 +99,131 @@ const callbackUrl = () => `${location.origin}/auth/callback`;
 
 let started = false;
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  ready: false,
+/** Approval checks by user id: one request per account per page load; waiting and unread ones are asked again next time. */
+const checks = new Map<string, Promise<Approval>>();
+function check(id: string): Promise<Approval> {
+  let p = checks.get(id);
+  if (!p) {
+    p = approval(id);
+    checks.set(id, p);
+    void p.then((a) => a.state !== 'approved' && checks.delete(id));
+  }
+  return p;
+}
+const known = new Map<string, Approval>();
 
-  init() {
-    if (started) return;
-    started = true;
-    if (!cloudEnabled()) {
-      set({ ready: true });
+export const useAuthStore = create<AuthState>((set, get) => {
+  /** Lets a session in once its account is approved; a waiting one is signed out here and named in `waiting`. */
+  async function admit(user: AuthUser) {
+    const a = await check(user.id);
+    known.set(user.id, a);
+    // Signed out or switched account meanwhile.
+    const { data } = await supabase().auth.getSession();
+    if (data.session?.user.id !== user.id) return;
+    if (a.state === 'pending') {
+      set({ waiting: user.email });
+      await supabase().auth.signOut({ scope: 'local' }).catch(() => {});
+      set({ user: null, admin: false, ready: true });
       return;
     }
-    // Fires INITIAL_SESSION straight away (from local storage; no network when signed out), then every change.
-    supabase().auth.onAuthStateChange((_event, session) => {
-      const user = toUser(session?.user);
-      set(user ? { user, ready: true, leaving: false } : { user, ready: true });
-    });
-  },
+    set({ user, admin: a.state === 'approved' && a.admin, ready: true, leaving: false, waiting: null });
+  }
 
-  async signUp(email, password, name) {
-    const { error } = await supabase().auth.signUp({
-      email,
-      password,
-      options: { data: { name: name.trim() }, emailRedirectTo: callbackUrl() },
-    });
-    if (error) throw friendly(error);
-    return 'check-email';
-  },
+  return {
+    user: null,
+    ready: false,
+    admin: false,
+    waiting: null,
 
-  async signIn(email, password) {
-    const { error } = await supabase().auth.signInWithPassword({ email, password });
-    if (error) throw friendly(error);
-  },
+    init() {
+      if (started) return;
+      started = true;
+      if (!cloudEnabled()) {
+        set({ ready: true });
+        return;
+      }
+      // Fires INITIAL_SESSION straight away (from local storage; no network when signed out), then every change.
+      supabase().auth.onAuthStateChange((_event, session) => {
+        const user = toUser(session?.user);
+        if (!user) return set({ user, admin: false, ready: true });
+        const a = known.get(user.id);
+        if (a?.state === 'approved') return set({ user, admin: a.admin, ready: true, leaving: false });
+        // Supabase calls made inside this callback would wait on its own auth lock: check once it has returned.
+        set({ ready: false });
+        setTimeout(() => void admit(user), 0);
+      });
+    },
 
-  async google() {
-    const { error } = await supabase().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callbackUrl() } });
-    if (error) throw friendly(error);
-  },
+    async signUp(email, password, name) {
+      const { error } = await supabase().auth.signUp({
+        email,
+        password,
+        options: { data: { name: name.trim() }, emailRedirectTo: callbackUrl() },
+      });
+      if (error) throw friendly(error);
+      return 'check-email';
+    },
 
-  async resetPassword(email) {
-    const { error } = await supabase().auth.resetPasswordForEmail(email, { redirectTo: callbackUrl() });
-    if (error) throw friendly(error);
-  },
+    async signIn(email, password) {
+      set({ waiting: null });
+      const { data, error } = await supabase().auth.signInWithPassword({ email, password });
+      if (error) throw friendly(error);
+      // Resolves once the account is let in, or turned away with `waiting` set.
+      const user = toUser(data.user);
+      if (user) await admit(user);
+    },
 
-  unsynced: null,
-  elsewhere: [],
-  leaving: false,
+    async google() {
+      const { error } = await supabase().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callbackUrl() } });
+      if (error) throw friendly(error);
+    },
 
-  async signOut(opts) {
-    if (!opts?.force) {
-      const { status, designId } = useCloudStore.getState();
-      // Designs with unsent edits that aren't open here (closed tab, left for My designs): only opening
-      // them online sends those edits.
-      const elsewhere = dirtyDesigns().filter((d) => d.id !== designId);
-      if (status.pending || (designId && isDirty(designId)) || elsewhere.length) {
-        set({ unsynced: 'ask', elsewhere });
+    async resetPassword(email) {
+      const { error } = await supabase().auth.resetPasswordForEmail(email, { redirectTo: callbackUrl() });
+      if (error) throw friendly(error);
+    },
+
+    unsynced: null,
+    elsewhere: [],
+    leaving: false,
+
+    async signOut(opts) {
+      if (!opts?.force) {
+        const { status, designId } = useCloudStore.getState();
+        // Designs with unsent edits that aren't open here (closed tab, left for My designs): only opening
+        // them online sends those edits.
+        const elsewhere = dirtyDesigns().filter((d) => d.id !== designId);
+        if (status.pending || (designId && isDirty(designId)) || elsewhere.length) {
+          set({ unsynced: 'ask', elsewhere });
+          return false;
+        }
+      }
+      set({ unsynced: null, elsewhere: [], leaving: true });
+      try {
+        const { error } = await supabase().auth.signOut();
+        // Offline (or the server is unreachable): forget the session in this browser anyway.
+        if (error) await supabase().auth.signOut({ scope: 'local' });
+      } catch {
+        await supabase().auth.signOut({ scope: 'local' }).catch(() => {});
+      }
+      set({ user: null });
+      await forgetAccountData();
+      return true;
+    },
+
+    async waitThenSignOut() {
+      set({ unsynced: 'waiting' });
+      const saved = await saveAll(SAVE_WAIT_MS);
+      if (get().unsynced !== 'waiting') return false; // cancelled meanwhile
+      if (!saved) {
+        set({ unsynced: 'stuck' });
         return false;
       }
-    }
-    set({ unsynced: null, elsewhere: [], leaving: true });
-    try {
-      const { error } = await supabase().auth.signOut();
-      // Offline (or the server is unreachable): forget the session in this browser anyway.
-      if (error) await supabase().auth.signOut({ scope: 'local' });
-    } catch {
-      await supabase().auth.signOut({ scope: 'local' }).catch(() => {});
-    }
-    set({ user: null });
-    await forgetAccountData();
-    return true;
-  },
+      return get().signOut({ force: true });
+    },
 
-  async waitThenSignOut() {
-    set({ unsynced: 'waiting' });
-    const saved = await saveAll(SAVE_WAIT_MS);
-    if (get().unsynced !== 'waiting') return false; // cancelled meanwhile
-    if (!saved) {
-      set({ unsynced: 'stuck' });
-      return false;
-    }
-    return get().signOut({ force: true });
-  },
-
-  cancelSignOut() {
-    set({ unsynced: null, elsewhere: [] });
-  },
-}));
+    cancelSignOut() {
+      set({ unsynced: null, elsewhere: [] });
+    },
+  };
+});

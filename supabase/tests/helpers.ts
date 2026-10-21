@@ -19,14 +19,21 @@ const made: TestUser[] = [];
 /** A unique throwaway email. */
 export const email = () => `t-${randomUUID()}@example.test`;
 
-/** Creates an auth user (confirmed unless told otherwise); removed by `cleanup()`. */
-export async function makeUser(address = email(), { confirmed = true } = {}): Promise<TestUser> {
+/** Creates an auth user (confirmed and approved unless told otherwise); removed by `cleanup()`. */
+export async function makeUser(address = email(), { confirmed = true, approved = true } = {}): Promise<TestUser> {
   const password = `pw-${randomUUID()}`;
   const { data, error } = await admin.auth.admin.createUser({ email: address, password, email_confirm: confirmed });
   if (error) throw error;
   const user = { id: data.user.id, email: address, password };
   made.push(user);
+  if (approved) await setAccount(user.id, { approved_at: new Date().toISOString() });
   return user;
+}
+
+/** Changes a user's row in public.accounts (approval, admin). */
+export async function setAccount(id: string, fields: { approved_at?: string | null; admin?: boolean }) {
+  const { error } = await admin.from('accounts').update(fields).eq('user_id', id);
+  if (error) throw error;
 }
 
 const signedIn = new Map<string, SupabaseClient>();
@@ -49,6 +56,6 @@ export async function cleanup() {
   const users = made.splice(0);
   for (const u of users) {
     const { error } = await admin.auth.admin.deleteUser(u.id);
-    if (error) throw error;
+    if (error && error.status !== 404) throw error; // a test may have deleted it already
   }
 }
