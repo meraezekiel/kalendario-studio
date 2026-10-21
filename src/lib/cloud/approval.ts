@@ -49,6 +49,9 @@ async function run<T>(call: PromiseLike<{ data: T; error: unknown }>): Promise<T
   return res.data;
 }
 
+/** How many new accounts are waiting for approval (not counting deactivated ones). */
+export const waitingCount = (list: AccountRow[]) => list.filter((a) => !a.approved_at && !a.deactivated_at).length;
+
 /** Admin only: every account, waiting ones first. */
 export async function listAccounts(): Promise<AccountRow[]> {
   return ((await run(supabase().rpc('admin_accounts'))) ?? []) as AccountRow[];

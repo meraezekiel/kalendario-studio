@@ -19,6 +19,11 @@ export default function AccountMenu() {
     <div className="acct" ref={h.box}>
       <button className="acct-avatar" onClick={h.toggle} aria-label="Account" aria-haspopup="menu" aria-expanded={h.open} title={h.user.email}>
         {h.initial}
+        {h.waiting > 0 && (
+          <span className="acct-dot" data-testid="sign-up-dot" title={`${h.waiting} sign-up${h.waiting === 1 ? '' : 's'} waiting for approval`}>
+            {h.waiting}
+          </span>
+        )}
       </button>
       {h.open && (
         <div className="acct-menu" role="menu" aria-label="Account">

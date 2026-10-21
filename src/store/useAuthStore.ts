@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { AuthError, User } from '@supabase/supabase-js';
-import { type Approval, approval } from '@/lib/cloud/approval';
+import { type Approval, approval, listAccounts, waitingCount } from '@/lib/cloud/approval';
 import { safeNext } from '@/lib/cloud/safeNext';
 import { dirtyDesigns, type DirtyDesign, forgetDirty, isDirty } from '@/lib/cloud/dirty';
 import { forgetLocalCopies } from '@/lib/cloud/localCopies';
@@ -31,6 +31,10 @@ interface AuthState {
   ready: boolean;
   /** The signed-in account may approve sign-ups. */
   admin: boolean;
+  /** For the admin: sign-ups waiting for approval (the red dot on the avatar). */
+  signUps: number;
+  /** Re-reads `signUps` (admin only; keeps the old count when it can't be read). */
+  countSignUps(): Promise<void>;
   /** Why an account was just turned away (the sign-in page says so): new and waiting, or deactivated. */
   waiting: keyof typeof WAITING_TEXT | null;
   init(): void;
@@ -137,6 +141,16 @@ export const useAuthStore = create<AuthState>((set, get) => {
     ready: false,
     admin: false,
     waiting: null,
+    signUps: 0,
+
+    async countSignUps() {
+      if (!get().admin) return;
+      try {
+        set({ signUps: waitingCount(await listAccounts()) });
+      } catch {
+        // Offline: keep the last count.
+      }
+    },
 
     init() {
       if (started) return;

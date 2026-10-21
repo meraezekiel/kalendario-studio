@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { type AccountRow, activateAccount, deactivateAccount, declineAccount, listAccounts } from '@/lib/cloud/approval';
+import { type AccountRow, activateAccount, deactivateAccount, declineAccount, listAccounts, waitingCount } from '@/lib/cloud/approval';
 import { megabytes } from '@/lib/cloud/limits';
 import { cloudEnabled } from '@/lib/cloud/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -38,7 +38,9 @@ export function useAdminHandler() {
 
   const load = useCallback(async () => {
     try {
-      setList(await listAccounts());
+      const list = await listAccounts();
+      setList(list);
+      useAuthStore.setState({ signUps: waitingCount(list) });
     } catch {
       setError('Could not load the accounts. Check your connection and try again.');
       setList((v) => v ?? []);
@@ -66,7 +68,7 @@ export function useAdminHandler() {
     await load();
   };
 
-  const waiting = list?.filter((a) => statusOf(a) === 'waiting').length ?? 0;
+  const waiting = list ? waitingCount(list) : 0;
   const stored = list?.reduce((n, a) => n + a.photo_bytes, 0) ?? 0;
   return {
     enabled: cloudEnabled(),

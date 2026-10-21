@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { listAccounts } from '@/lib/cloud/approval';
 import { megabytes, PHOTO_SPACE_BYTES } from '@/lib/cloud/limits';
 import { photoUsage } from '@/lib/cloud/photos';
 import { cloudEnabled } from '@/lib/cloud/supabase';
@@ -14,6 +13,7 @@ export function useAccountMenuHandler() {
   const user = useAuthStore((s) => s.user);
   const ready = useAuthStore((s) => s.ready);
   const admin = useAuthStore((s) => s.admin);
+  const waiting = useAuthStore((s) => s.signUps);
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
@@ -33,18 +33,17 @@ export function useAccountMenuHandler() {
     };
   }, [open, user]);
 
-  // For the admin: how many sign-ups are waiting, fetched fresh each time the menu opens.
-  const [waiting, setWaiting] = useState(0);
+  // For the admin: how many sign-ups are waiting, read on load, on coming back to the tab, and when the menu opens.
   useEffect(() => {
-    if (!open || !admin) return;
-    let live = true;
-    listAccounts().then(
-      (list) => live && setWaiting(list.filter((a) => !a.approved_at && !a.deactivated_at).length),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
+    if (!admin) return;
+    const count = () => void useAuthStore.getState().countSignUps();
+    count();
+    const onVisible = () => document.visibilityState === 'visible' && count();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [admin]);
+  useEffect(() => {
+    if (open && admin) void useAuthStore.getState().countSignUps();
   }, [open, admin]);
 
   // Close on a click outside or Escape.
@@ -75,7 +74,8 @@ export function useAccountMenuHandler() {
     ready,
     user,
     admin,
-    waiting,
+    /** Shown as a red dot on the avatar (admin only). */
+    waiting: admin ? waiting : 0,
     initial: (user?.name || user?.email || '?').charAt(0).toUpperCase(),
     open,
     usage: used == null ? null : `${mb(used)} MB of ${megabytes(PHOTO_SPACE_BYTES)} used`,

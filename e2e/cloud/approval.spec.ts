@@ -19,11 +19,22 @@ async function openDashboard(page: Page) {
   const boss = await newUser('Boss');
   await setAccount(boss.id, { admin: true });
   await signIn(page, boss);
+  // A red dot on the avatar says how many are waiting, without opening anything.
+  await expect(page.getByTestId('sign-up-dot')).toHaveText(/^[1-9]\d*$/);
   await page.getByRole('button', { name: 'Account' }).click();
   await page.getByRole('menuitem', { name: /^Accounts \(\d+ waiting\)$/ }).click();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole('heading', { name: 'Accounts' })).toBeVisible();
   return boss;
+}
+
+/** The dot on the avatar shows the same number as the dashboard's "n waiting". */
+async function dotMatchesDashboard(page: Page) {
+  const summary = page.locator('.admin-summary');
+  await expect(summary).toHaveText(/\d+ waiting/);
+  const n = Number(/(\d+) waiting/.exec((await summary.textContent()) ?? '')![1]);
+  if (n) await expect(page.getByTestId('sign-up-dot')).toHaveText(String(n));
+  else await expect(page.getByTestId('sign-up-dot')).toHaveCount(0);
 }
 
 test('a new account waits until the admin activates it, and can be deactivated again', async ({ page, browser }) => {
@@ -53,11 +64,13 @@ test('a new account waits until the admin activates it, and can be deactivated a
   await admin.screenshot({ path: 'e2e/shots/48-accounts.png' });
   await row.getByRole('button', { name: 'Activate' }).click();
   await expect(row.locator('.account-status')).toHaveText('Active');
+  await dotMatchesDashboard(admin);
 
   await tryToSignIn(page, ana);
   await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
   await expect(page).toHaveURL(/\/designs/);
-  // Only the admin has the dashboard.
+  // Only the admin has the dashboard, and the dot.
+  await expect(page.getByTestId('sign-up-dot')).toHaveCount(0);
   await page.getByRole('button', { name: 'Account' }).click();
   await expect(page.getByRole('menuitem', { name: /Accounts/ })).toHaveCount(0);
   await page.goto('/admin');
@@ -90,10 +103,12 @@ test('the admin can decline a sign-up, which removes the account', async ({ page
   await expect(row.getByRole('button', { name: 'Decline' })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'e2e/shots/49-accounts-phone.png' });
+  await page.locator('.top').screenshot({ path: 'e2e/shots/50-sign-up-dot.png' });
   await row.getByRole('button', { name: 'Decline' }).click();
   await expect(row.getByRole('button', { name: 'Click again to decline' })).toBeVisible();
   expect(await userExists(spam.id)).toBe(true);
   await row.getByRole('button', { name: 'Click again to decline' }).click();
   await expect(row).toHaveCount(0);
+  await dotMatchesDashboard(page);
   await expect.poll(() => userExists(spam.id)).toBe(false);
 });
