@@ -88,7 +88,9 @@ test('signed-out top bar shows "Sign in" and the editor still works', async ({ p
   const supabaseHost = new URL(process.env.TEST_SUPABASE_URL!).host;
   const calls: string[] = [];
   page.on('request', (r) => {
-    if (new URL(r.url()).host === supabaseHost) calls.push(r.url());
+    const u = new URL(r.url());
+    // Reading the public Print Kit products is the one call allowed: it sends nothing about the visitor.
+    if (u.host === supabaseHost && !(r.method() === 'GET' && u.pathname === '/rest/v1/products')) calls.push(r.url());
   });
   const errors = await openStudio(page);
   await expect(page.locator('header.top').getByRole('link', { name: 'Sign in' })).toBeVisible();

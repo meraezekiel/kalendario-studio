@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -22,7 +23,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href={FONTS_URL} crossOrigin="anonymous" />
         <style id="pagesize">{'@page{size:210mm 297mm;margin:0}'}</style>
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Visits and where they come from (Vercel Web Analytics: no cookies, nothing personal). Only on
+            Vercel, which serves its script; elsewhere (local runs, tests) it would 404. */}
+        {process.env.VERCEL && <Analytics />}
+      </body>
     </html>
   );
 }

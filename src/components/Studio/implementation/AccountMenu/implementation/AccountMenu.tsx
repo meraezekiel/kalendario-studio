@@ -45,6 +45,11 @@ export default function AccountMenu() {
               Products
             </Link>
           )}
+          {h.admin && (
+            <Link className="acct-item" role="menuitem" href="/admin/stats">
+              Stats
+            </Link>
+          )}
           <button className="acct-item" role="menuitem" onClick={h.signOut}>
             Sign out
           </button>

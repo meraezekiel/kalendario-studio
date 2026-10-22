@@ -1,6 +1,7 @@
 'use client';
 
 import { CUSTOM_MAX, CUSTOM_MIN, MONTHS, UNIT_MM } from '@/lib/calendar/constants';
+import { countEvent } from '@/lib/cloud/stats';
 import { assetInUse, clonePage, dims, ensureBackground, makeYear, mkBackground, syncDesign } from '@/lib/calendar/document';
 import { mkCal, mkEvents, mkGraphic, mkImage, mkPage, mkShape, mkText } from '@/lib/calendar/factories';
 import { DECOS } from '@/lib/graphics/deco';
@@ -462,6 +463,7 @@ export function applyTemplate(key: string): void | Promise<void> {
 }
 
 function applyTemplateNow(key: string) {
+  countEvent(`template:${key}`);
   S().mutate((d) => {
     d.pages = TEMPLATES[key].make();
     d.cur = 0;

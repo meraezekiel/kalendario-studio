@@ -80,8 +80,36 @@ test.describe('Print Kit', () => {
     await expect(page.getByTestId('supply-links')).toBeVisible();
   });
 
+  test('the design service offer shows only when a Messenger link is set', async ({ page }) => {
+    await preview(page, { products: PRODUCTS, designServiceUrl: 'https://m.me/example' });
+    await openStudio(page);
+    await page.getByRole('button', { name: 'Print Kit', exact: true }).click();
+    const offer = page.getByTestId('design-service');
+    await expect(offer).toContainText('Busy? I’ll design it for you.');
+    await expect(offer.getByRole('link', { name: 'Message me' })).toHaveAttribute('href', 'https://m.me/example');
+    await page.screenshot({ path: 'e2e/shots/50-design-service.png' });
+    await page.reload();
+    await page.addInitScript(() => void (window.__KS_SUPPORT__ = { ...window.__KS_SUPPORT__, designServiceUrl: '' }));
+    await page.reload();
+    await page.getByRole('button', { name: 'Print Kit', exact: true }).click();
+    await expect(page.getByTestId('design-service')).toHaveCount(0);
+  });
+
+  test('Support the dev shows the GCash QR only when tapped', async ({ page }) => {
+    await preview(page, { gcashQr: '/graphics/fluent/airplane.svg', gcashName: 'J. L. A.' });
+    const errors = await openStudio(page);
+    await page.getByRole('button', { name: 'Print Kit', exact: true }).click();
+    await expect(page.getByTestId('gcash-qr')).toHaveCount(0);
+    await page.getByTestId('gcash-button').click();
+    await expect(page.getByTestId('gcash-qr').getByRole('img', { name: 'GCash QR code' })).toBeVisible();
+    await expect(page.getByTestId('gcash-qr')).toContainText('Scan with GCash · J. L. A.');
+    await page.getByTestId('gcash-button').click();
+    await expect(page.getByTestId('gcash-qr')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
   test('with nothing configured there is no Print Kit tab and the note only offers to save', async ({ page }) => {
-    await preview(page, { coffeeUrl: '', products: [] });
+    await preview(page, { coffeeUrl: '', gcashQr: '', products: [] });
     await openStudio(page);
     await expect(page.getByRole('button', { name: 'Print Kit', exact: true })).toHaveCount(0);
     await exportPng(page);

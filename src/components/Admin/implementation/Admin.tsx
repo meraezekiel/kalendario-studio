@@ -31,6 +31,7 @@ export default function Admin() {
         <nav className="admin-tabs">
           <Link href="/admin" aria-current="page">Accounts</Link>
           <Link href="/admin/products">Products</Link>
+          <Link href="/admin/stats">Stats</Link>
         </nav>
         <h1 className="admin-title">Accounts</h1>
         <p className="hint admin-summary">{h.summary}</p>

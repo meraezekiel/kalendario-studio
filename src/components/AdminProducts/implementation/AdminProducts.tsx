@@ -36,6 +36,7 @@ export default function AdminProducts() {
         <nav className="admin-tabs">
           <Link href="/admin">Accounts</Link>
           <Link href="/admin/products" aria-current="page">Products</Link>
+          <Link href="/admin/stats">Stats</Link>
         </nav>
         <h1 className="admin-title">Print Kit</h1>
         <p className="hint admin-summary">

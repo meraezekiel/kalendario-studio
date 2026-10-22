@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { countOpen } from '@/lib/cloud/stats';
 import { useRouter } from 'next/navigation';
 import { setNavigate } from '@/store/actions';
 import { useCloudStore } from '@/store/useCloudStore';
@@ -16,6 +17,7 @@ export function useStudioHandler(designId?: string) {
   usePasteHandler();
   const router = useRouter();
   useEffect(() => setNavigate((path) => router.push(path)), [router]);
+  useEffect(countOpen, []);
   const storeReady = useStudioStore((s) => s.ready);
   const session = useCloudStore((s) => s.designId);
   const denied = useCloudStore((s) => !!designId && s.designId === designId && s.status.state === 'denied');

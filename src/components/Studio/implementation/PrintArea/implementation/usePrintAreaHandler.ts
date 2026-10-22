@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { DW } from '@/lib/calendar/constants';
 import { dims } from '@/lib/calendar/document';
 import { sheetLayout, toSheets } from '@/lib/calendar/sheet';
+import { countEvent } from '@/lib/cloud/stats';
 import { offerThanks } from '@/store/actions';
 import { loadPhotos } from '@/store/usePhotoUrlStore';
 import { useStudioStore } from '@/store/useStudioStore';
@@ -27,6 +28,7 @@ export function usePrintAreaHandler() {
       if (done) return;
       done = true;
       useStudioStore.getState().set({ printing: null });
+      countEvent('print');
       offerThanks();
     };
     addEventListener('afterprint', finish, { once: true });

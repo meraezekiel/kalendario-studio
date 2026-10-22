@@ -28,6 +28,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .rail button.on{background:var(--accent-soft);color:var(--accent)}
 .rail button.rail-end{margin-top:auto}
 .btn.coffee{display:flex;justify-content:center;text-decoration:none;background:#ffdd00;border-color:#e6c700;color:#1f1a00;font-weight:700;margin-top:10px}
+.kit-service{display:flex;flex-direction:column;gap:6px;align-items:flex-start;padding:12px;border-radius:12px;background:var(--accent-soft)}
+.kit-service b{font-size:14px}
+.kit-gcash{margin-top:10px;width:100%;background:#0070e0;border-color:#0062c4;color:#fff}
+.kit-gcash:hover{border-color:#004a94}
+.kit-qr{margin:10px 0 0;text-align:center}
+.kit-qr img{width:100%;max-width:240px;border-radius:12px;border:1px solid var(--line);background:#fff}
+.kit-qr figcaption{margin-top:6px}
 .kit-foot{margin-top:auto;padding-top:12px;border-top:1px solid var(--line)}
 .supplies{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:6px}
 .supplies a{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--ink)}
@@ -321,6 +328,7 @@ input.cloud-name:focus-visible{outline:2px solid var(--sel);outline-offset:1px;b
 .designs-tabs button{font-size:13px;padding:7px 6px}
 .admin-title{margin:0 0 4px;font-size:22px}
 .admin-summary{margin:0 0 16px}
+.admin-summary a{color:var(--accent)}
 .accounts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;max-width:820px}
 .account{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
 .account-who{flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px;font-size:13px;overflow-wrap:anywhere}
@@ -332,6 +340,15 @@ input.cloud-name:focus-visible{outline:2px solid var(--sel);outline-offset:1px;b
 .account-status.admin,.account-status.active{background:var(--accent-soft);color:var(--accent)}
 .account-status.waiting{background:#fff1d6;color:#8a5a00}
 .account-status.deactivated{background:#fde2e2;color:var(--danger)}
+.stats-grid{display:flex;flex-direction:column;gap:14px;max-width:820px}
+.stats-grid .note-box{margin:0;font-size:13px}
+.stats{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13px}
+.stats th,.stats td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--line)}
+.stats th:first-child,.stats td:first-child{text-align:left}
+.stats th{font-size:12px;color:var(--muted);font-weight:600}
+.stats th:first-child{color:var(--ink);font-size:13px}
+.stats tr:last-child td{border-bottom:0}
+.stats td:not(:first-child){font-variant-numeric:tabular-nums;width:72px}
 .admin-tabs{display:flex;gap:4px;margin:0 0 14px}
 .admin-tabs a{padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none}
 .admin-tabs a:hover{color:var(--accent)}

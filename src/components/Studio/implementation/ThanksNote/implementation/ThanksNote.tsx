@@ -16,9 +16,10 @@ export default function ThanksNote() {
       </div>
       {h.support && (
         <>
-          <p>{h.hasLinks ? 'Printing at home? The Print Kit has stands, binding and photo paper.' : 'Kalendaryo Studio is free. If it saved you time, a coffee keeps it going.'}</p>
+          <p>{h.hasLinks ? 'Printing at home? The Print Kit has stands, binding and photo paper.' : 'Kalendaryo Studio is free. If it saved you time, any amount keeps it going.'}</p>
           <div className="thanks-acts">
             {h.hasLinks && <button className="btn" onClick={h.showSupplies}>Print Kit</button>}
+            {h.gcash && !h.hasLinks && <button className="btn" onClick={h.showSupplies}>💙 Support the dev</button>}
             {h.coffeeUrl && <a className="btn coffee" href={h.coffeeUrl} target="_blank" rel="noopener noreferrer" onClick={h.close}>☕ Buy me a coffee</a>}
           </div>
         </>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { countEvent } from '@/lib/cloud/stats';
 import { getSupport, hasSupport } from '@/lib/support/support';
 import { saveDesignFile } from '@/store/actions';
 import { useProductsStore } from '@/store/useProductsStore';
@@ -23,6 +24,7 @@ export function useThanksNoteHandler() {
     open,
     support: hasSupport(support, products),
     coffeeUrl: support.coffeeUrl,
+    gcash: !!support.gcashQr,
     save: () => {
       saveDesignFile();
       close();
@@ -30,6 +32,7 @@ export function useThanksNoteHandler() {
     hasLinks: products.length > 0,
     close,
     showSupplies: () => {
+      countEvent('print_kit_open');
       useStudioStore.getState().set({ tab: 'support', thanks: false });
     },
   };

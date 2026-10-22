@@ -133,3 +133,8 @@ export async function deleteAllProducts() {
   if (pics.length) await admin().storage.from('products').remove(pics);
   if (data?.length) await admin().from('products').delete().in('id', data.map((p) => p.id));
 }
+
+/** Clears every usage count (the TEST project's stats all come from tests). */
+export async function deleteAllStats() {
+  await admin().from('stats').delete().gte('n', 0);
+}

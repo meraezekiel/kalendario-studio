@@ -14,7 +14,7 @@ declare global {
 /** The support settings. */
 export function getSupport(): SupportConfig {
   const c = { ...SUPPORT, ...(typeof window !== 'undefined' ? window.__KS_SUPPORT__ : undefined) };
-  return { coffeeUrl: c.coffeeUrl.trim() };
+  return { coffeeUrl: c.coffeeUrl.trim(), gcashQr: c.gcashQr.trim(), gcashName: c.gcashName.trim(), designServiceUrl: c.designServiceUrl.trim() };
 }
 
 /** Sample products from the browser tests, or undefined to read the real ones. */
@@ -24,7 +24,7 @@ export function previewProducts(): Product[] | undefined {
 
 /** Whether there's anything to show in the Print Kit tab. */
 export function hasSupport(c: SupportConfig, products: Product[]) {
-  return Boolean(c.coffeeUrl || products.length);
+  return Boolean(c.coffeeUrl || c.gcashQr || c.designServiceUrl || products.length);
 }
 
 export function thanksSeen() {

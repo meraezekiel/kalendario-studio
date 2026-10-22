@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { toPng } from 'html-to-image';
+import { countEvent } from '@/lib/cloud/stats';
 import { offerThanks } from '@/store/actions';
 import { loadPhotos } from '@/store/usePhotoUrlStore';
 import { curPage, toast, useStudioStore } from '@/store/useStudioStore';
@@ -29,6 +30,7 @@ export function useExportBoxHandler() {
         a.click();
         a.remove();
         toast('PNG saved to your downloads.');
+        countEvent('export_png');
         offerThanks();
       } catch {
         toast('PNG export failed. Use Print and choose “Save as PDF” instead.');
