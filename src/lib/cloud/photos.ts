@@ -83,7 +83,7 @@ async function run<T>(call: PromiseLike<{ data: T; error: unknown }>): Promise<T
   return res.data;
 }
 
-function toBlob(dataUrl: string): Blob {
+export function toBlob(dataUrl: string): Blob {
   const comma = dataUrl.indexOf(',');
   const type = /^data:([^;,]+)/.exec(dataUrl)?.[1] ?? 'image/jpeg';
   const bin = atob(dataUrl.slice(comma + 1));

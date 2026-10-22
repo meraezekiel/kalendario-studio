@@ -11,7 +11,8 @@ const TABS: { id: DrawerTab; label: string; icon: React.ReactNode }[] = [
   { id: 'page', label: 'Pages', icon: <><path d="M6 3h9l4 4v14H6z" /><path d="M15 3v4h4" /></> },
 ];
 
-const SUPPORT_TAB = { id: 'support' as const, label: 'Support', icon: <><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z" /><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17" /><path d="M8 3c0 1.5 1 1.5 1 3M12 3c0 1.5 1 1.5 1 3" /></> };
+/** "Print Kit": things for printing at home (affiliate products), plus the optional coffee link. */
+const SUPPORT_TAB = { id: 'support' as const, label: 'Print Kit', icon: <><path d="M7 9V3h10v6" /><rect x="3" y="9" width="18" height="8" rx="2" /><path d="M7 14h10v7H7z" /><path d="M17 12h.01" /></> };
 
 export default function ToolRail() {
   const { tab, setTab, showSupport } = useToolRailHandler();

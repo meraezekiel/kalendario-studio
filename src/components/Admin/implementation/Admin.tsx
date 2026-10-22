@@ -28,6 +28,10 @@ export default function Admin() {
         <AccountMenu />
       </header>
       <main className="designs-main">
+        <nav className="admin-tabs">
+          <Link href="/admin" aria-current="page">Accounts</Link>
+          <Link href="/admin/products">Products</Link>
+        </nav>
         <h1 className="admin-title">Accounts</h1>
         <p className="hint admin-summary">{h.summary}</p>
         {h.error && <p className="auth-error" role="alert">{h.error}</p>}

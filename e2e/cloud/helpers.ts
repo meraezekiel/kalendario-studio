@@ -125,3 +125,11 @@ export async function memberLinks(designId: string): Promise<Record<string, stri
   if (error) throw error;
   return Object.fromEntries((data ?? []).map((m) => [m.email as string, (m.user_id as string | null) ?? null]));
 }
+
+/** Deletes every Print Kit product, with its picture (the TEST project's products are all made by tests). */
+export async function deleteAllProducts() {
+  const { data } = await admin().from('products').select('id, image');
+  const pics = (data ?? []).map((p) => p.image).filter(Boolean) as string[];
+  if (pics.length) await admin().storage.from('products').remove(pics);
+  if (data?.length) await admin().from('products').delete().in('id', data.map((p) => p.id));
+}

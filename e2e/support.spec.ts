@@ -1,8 +1,18 @@
 import { expect, type Page, test } from '@playwright/test';
 import { openStudio } from './helpers';
 
-/** Previews the support settings (normally edited in src/lib/support/config.ts). */
+/** Previews the support settings (normally src/lib/support/config.ts, and the products from /admin/products). */
 const preview = (page: Page, cfg: object) => page.addInitScript((c) => void (window.__KS_SUPPORT__ = c), cfg);
+
+const product = (id: string, name: string, price: number | null, extra = {}) => ({
+  id, name, note: '', price, price_checked_at: '2026-10-22T03:00:00Z', url: `https://s.shopee.ph/${id}`, image: null, position: 0, hidden: false, ...extra,
+});
+const PRODUCTS = [
+  product('stand', 'Desk calendar stand', 1249.5, { position: 2, note: 'For 8×5 in desk calendars' }),
+  product('paper', 'Glossy photo paper', 249, { position: 1 }),
+  product('hidden', 'Hidden one', 10, { hidden: true }),
+  product('unfinished', 'No link yet', null, { url: '' }),
+];
 
 async function exportPng(page: Page) {
   const dl = page.waitForEvent('download');
@@ -10,27 +20,32 @@ async function exportPng(page: Page) {
   await dl;
 }
 
-test.describe('Support', () => {
-  test('Support tab lists print supplies and stays quiet by default', async ({ page }) => {
+test.describe('Print Kit', () => {
+  test('Print Kit tab lists the visible print supplies in order, with price and affiliate note', async ({ page }) => {
+    await preview(page, { products: PRODUCTS });
     const errors = await openStudio(page);
-    await page.getByRole('button', { name: 'Support' }).click();
+    await page.getByRole('button', { name: 'Print Kit', exact: true }).click();
     const links = page.getByTestId('supply-links').getByRole('link');
-    await expect(links.first()).toBeVisible();
-    expect(await links.count()).toBeGreaterThan(2);
+    await expect(links).toHaveCount(2);
+    await expect(links.nth(0)).toContainText('Glossy photo paper');
+    await expect(links.nth(0)).toContainText('₱249');
+    await expect(links.nth(1)).toContainText('₱1,249.50');
+    await expect(links.nth(1)).toContainText('Price as of Oct 22');
+    await expect(links.nth(1)).toHaveAttribute('href', 'https://s.shopee.ph/stand');
     await expect(links.first()).toHaveAttribute('target', '_blank');
     await expect(links.first()).toHaveAttribute('rel', /sponsored/);
-    // No coffee page is set in the shipped config, so no coffee button and no affiliate note.
+    await expect(page.getByTestId('affiliate-note')).toBeVisible();
+    // No coffee page is set in the shipped config.
     await expect(page.getByTestId('coffee-link')).toHaveCount(0);
-    await expect(page.getByTestId('affiliate-note')).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
   test('thank-you note shows once after the first export, never again', async ({ page }) => {
-    await preview(page, { coffeeUrl: 'https://buymeacoffee.com/example', affiliate: true });
+    await preview(page, { coffeeUrl: 'https://buymeacoffee.com/example', products: PRODUCTS });
     const errors = await openStudio(page);
     await expect(page.getByTestId('thanks-note')).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Support' }).click();
+    await page.getByRole('button', { name: 'Print Kit', exact: true }).click();
     await expect(page.getByTestId('coffee-link')).toHaveAttribute('href', 'https://buymeacoffee.com/example');
     await expect(page.getByTestId('affiliate-note')).toBeVisible();
     await page.screenshot({ path: 'e2e/shots/34-support.png' });
@@ -56,23 +71,24 @@ test.describe('Support', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Print supplies button in the note opens the Support tab', async ({ page }) => {
+  test('Print Kit button in the note opens the Print Kit tab', async ({ page }) => {
+    await preview(page, { products: PRODUCTS });
     await openStudio(page);
     await exportPng(page);
-    await page.getByTestId('thanks-note').getByRole('button', { name: 'Print supplies' }).click();
+    await page.getByTestId('thanks-note').getByRole('button', { name: 'Print Kit', exact: true }).click();
     await expect(page.getByTestId('thanks-note')).toHaveCount(0);
     await expect(page.getByTestId('supply-links')).toBeVisible();
   });
 
-  test('with nothing configured there is no Support tab and the note only offers to save', async ({ page }) => {
-    await preview(page, { coffeeUrl: '', links: [] });
+  test('with nothing configured there is no Print Kit tab and the note only offers to save', async ({ page }) => {
+    await preview(page, { coffeeUrl: '', products: [] });
     await openStudio(page);
-    await expect(page.getByRole('button', { name: 'Support' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Print Kit', exact: true })).toHaveCount(0);
     await exportPng(page);
     const note = page.getByTestId('thanks-note');
     await expect(note).toBeVisible();
     await expect(note.getByRole('link')).toHaveCount(0);
-    await expect(note.getByRole('button', { name: 'Print supplies' })).toHaveCount(0);
+    await expect(note.getByRole('button', { name: 'Print Kit', exact: true })).toHaveCount(0);
     const dl = page.waitForEvent('download');
     await note.getByRole('button', { name: 'Save design file' }).click();
     expect((await dl).suggestedFilename()).toMatch(/\.kalendaryo$/);
