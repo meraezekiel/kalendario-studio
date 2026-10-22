@@ -119,3 +119,61 @@ test('members can’t open the products page', async ({ page }) => {
   await page.goto('/admin/products');
   await expect(page.getByText('This page is for the site admin.')).toBeVisible();
 });
+
+test('pasting a Shopee link adds the product with its name and picture; a link Shopee won’t read still adds it', async ({ page }) => {
+  const boss = await newUser('Boss');
+  await setAccount(boss.id, { admin: true });
+  await signIn(page, boss);
+  const png = (await makePng(page, '#7b3fa0')).toString('base64');
+  // Shopee itself isn't called from the tests: the server's answer is stood in for.
+  let reply: object = { name: 'Plastic ring binder A4', image: `data:image/png;base64,${png}` };
+  let status = 200;
+  await page.route('**/api/product-preview', (r) => r.fulfill({ status, json: reply }));
+  await page.goto('/admin/products');
+  const box = page.getByTestId('product-link').getByRole('textbox');
+  const cards = page.getByTestId('product');
+  await expect(page.getByText('Loading products…')).toHaveCount(0);
+  const before = await cards.count();
+
+  await box.fill('https://example.com/not-shopee');
+  await page.getByTestId('product-link').getByRole('button', { name: 'Add' }).click();
+  await expect(page.locator('.auth-error')).toHaveText('Paste a Shopee link, like https://s.shopee.ph/…');
+
+  // Pasting a link adds it straight away.
+  await box.fill('');
+  await box.focus();
+  await box.evaluate((el) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', 'https://s.shopee.ph/binder');
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(cards).toHaveCount(before + 1);
+  const binder = cards.last();
+  await expect(binder.getByLabel('Name')).toHaveValue('Plastic ring binder A4');
+  await expect(binder.getByLabel('Shopee affiliate link')).toHaveValue('https://s.shopee.ph/binder');
+  await expect.poll(() => binder.locator('.product-img img').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  await expect(box).toHaveValue('');
+  await page.screenshot({ path: 'e2e/shots/53-product-from-link.png' });
+
+  // Shopee refuses: the product still comes in with its link, to finish by hand.
+  status = 502;
+  reply = { error: 'Couldn’t read that Shopee link.' };
+  await box.fill('https://s.shopee.ph/stand');
+  await box.press('Enter');
+  await expect(cards).toHaveCount(before + 2);
+  await expect(cards.last().getByLabel('Shopee affiliate link')).toHaveValue('https://s.shopee.ph/stand');
+  await expect(cards.last().getByLabel('Name')).toHaveValue('');
+  await expect(page.locator('.auth-error')).toContainText('added with just its link');
+});
+
+test('only the admin can use the Shopee link reader', async ({ page }) => {
+  await signIn(page, await newUser('Member'));
+  const token = await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.endsWith('-auth-token'));
+    return key ? (JSON.parse(localStorage.getItem(key)!) as { access_token: string }).access_token : '';
+  });
+  expect(token).not.toBe('');
+  const ask = (auth: string) => page.request.post('/api/product-preview', { headers: auth ? { Authorization: `Bearer ${auth}` } : {}, data: { url: 'https://s.shopee.ph/x' } });
+  expect((await ask('')).status()).toBe(401);
+  expect((await ask(token)).status()).toBe(403);
+});

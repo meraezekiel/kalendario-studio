@@ -4,6 +4,7 @@ import Link from 'next/link';
 import AccountMenu from '@/components/Studio/implementation/AccountMenu/implementation/AccountMenu';
 import { useDragReorderHandler } from './handler/useDragReorderHandler';
 import ProductCard from './ProductCard/implementation/ProductCard';
+import { useAddLinkHandler } from './handler/useAddLinkHandler';
 import { useAddZoneHandler } from './handler/useAddZoneHandler';
 import { useAdminProductsHandler } from './useAdminProductsHandler';
 
@@ -13,6 +14,7 @@ export default function AdminProducts() {
   const list = h.list ?? [];
   const drag = useDragReorderHandler(list.length, (from, to) => void h.move(from, to));
   const zone = useAddZoneHandler(h.add);
+  const link = useAddLinkHandler(h.addFromLink);
   if (!h.enabled || (h.signedIn && !h.admin)) {
     return (
       <main className="auth-page">
@@ -54,6 +56,26 @@ export default function AdminProducts() {
                 </li>
               ))}
             </ul>
+            <form className="product-link" onSubmit={link.onSubmit} data-testid="product-link">
+              <label className="f">
+                Add from a Shopee link
+                <span className="product-link-row">
+                  <input
+                    type="url"
+                    inputMode="url"
+                    placeholder="Paste a link, e.g. https://s.shopee.ph/…"
+                    value={link.draft}
+                    onChange={(e) => link.setDraft(e.target.value)}
+                    onPaste={link.onPaste}
+                    disabled={h.adding}
+                  />
+                  <button type="submit" className="btn primary" disabled={h.adding || !link.draft.trim()}>
+                    {h.adding ? 'Adding…' : 'Add'}
+                  </button>
+                </span>
+              </label>
+              <p className="hint">The name and picture come from Shopee. Then type the price: Shopee doesn’t share it.</p>
+            </form>
             <div
               className={`product-add${zone.over ? ' over' : ''}`}
               data-testid="product-add"

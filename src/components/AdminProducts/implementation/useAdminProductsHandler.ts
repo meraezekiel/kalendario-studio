@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { fetchProductPreview } from '@/lib/cloud/productPreview';
 import { addProduct, deleteProduct, listProducts, removeProductImage, reorderProducts, updateProduct, uploadProductImage } from '@/lib/cloud/products';
 import { cloudEnabled } from '@/lib/cloud/supabase';
 import { moveItem, type Product } from '@/lib/support/products';
+import { isShopeeUrl } from '@/lib/support/shopeeLink';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export type ProductFields = Partial<Omit<Product, 'id'>>;
@@ -58,6 +60,34 @@ export function useAdminProductsHandler() {
       }
     } catch {
       setError('Could not add the product. Please try again.');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  /** Adds a product from its Shopee link: the name and picture come from Shopee, the price is typed after. */
+  const addFromLink = async (link: string): Promise<boolean> => {
+    setError('');
+    if (!isShopeeUrl(link)) {
+      setError('Paste a Shopee link, like https://s.shopee.ph/…');
+      return false;
+    }
+    setAdding(true);
+    const position = listRef.current.reduce((n, p) => Math.max(n, p.position), 0) + 1;
+    let found: { name: string; image: File | null } = { name: '', image: null };
+    try {
+      found = await fetchProductPreview(link);
+    } catch {
+      setError('Couldn’t read the name and picture from Shopee, so the product was added with just its link. Fill in the rest below.');
+    }
+    try {
+      const image = found.image ? await uploadProductImage(found.image).catch(() => null) : null;
+      const p = await addProduct({ position, name: found.name, url: link.trim(), image });
+      setList((l) => [...(l ?? []), p]);
+      return true;
+    } catch {
+      setError('Could not add the product. Please try again.');
+      return false;
     } finally {
       setAdding(false);
     }
@@ -126,6 +156,7 @@ export function useAdminProductsHandler() {
     adding,
     summary: list ? `${list.length} product${list.length === 1 ? '' : 's'} · ${shown} shown in the Print Kit` : '',
     add,
+    addFromLink,
     save,
     setImage,
     remove,
