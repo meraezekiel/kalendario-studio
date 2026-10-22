@@ -19,6 +19,11 @@ const KIT: [string, string][] = [
   ['print_kit_open', 'Opened the Print Kit'],
   ['product_click', 'Tapped a product'],
   ['design_service_click', 'Tapped “Message me” (design service)'],
+  ['gcash_open', 'Opened the GCash QR'],
+];
+const ORDERS: [string, string][] = [
+  ['order_open', 'Opened “Order prints”'],
+  ['print_order', 'Sent an order to Messenger'],
 ];
 
 /** The /admin/stats page: what people do in the editor, counted per day (no names, no tracking). */
@@ -60,11 +65,12 @@ export function useAdminStatsHandler() {
     error,
     use: lines(USE),
     kit: lines(KIT),
+    orders: lines(ORDERS),
     templates: Object.entries(TEMPLATES)
       .map(([key, tpl]) => ({ label: tpl.name, totals: t(`template:${key}`) }))
       .sort((a, b) => b.totals.month - a.totals.month || a.label.localeCompare(b.label)),
     insight: totals
-      ? `Last 30 days · Visits: ${t('open').month} · Prints and PNGs: ${made} (${percent(made, t('open').month)} of visits) · Product taps: ${t('product_click').month}`
+      ? `Last 30 days · Visits: ${t('open').month} · Prints and PNGs: ${made} (${percent(made, t('open').month)} of visits) · Product taps: ${t('product_click').month} · Print orders sent: ${t('print_order').month}`
       : '',
   };
 }

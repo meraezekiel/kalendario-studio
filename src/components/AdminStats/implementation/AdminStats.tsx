@@ -70,6 +70,7 @@ export default function AdminStats() {
             <p className="note-box" data-testid="stats-insight">{h.insight}</p>
             <StatTable title="Using the editor" lines={h.use} />
             <StatTable title="Print Kit" lines={h.kit} />
+            <StatTable title="Print orders" lines={h.orders} />
             <StatTable title="Templates picked" lines={h.templates} />
           </div>
         )}

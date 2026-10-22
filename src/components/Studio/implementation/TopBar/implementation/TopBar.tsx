@@ -39,6 +39,11 @@ export default function TopBar() {
           <button className="btn primary" onClick={h.printOne}>Print page</button>
           <button className="btn" onClick={h.printAll}>Print all</button>
           <button className="btn" onClick={h.png}>PNG</button>
+          {h.canOrder && (
+            <button className="btn order-btn" onClick={h.order} title={`Have ${h.shop} print this calendar for you`} data-testid="order-prints">
+              Order prints
+            </button>
+          )}
         </span>
       )}
       {h.cloud && <Presence />}

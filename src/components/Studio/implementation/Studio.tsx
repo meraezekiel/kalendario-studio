@@ -5,6 +5,7 @@ import CloudBanner from './CloudBanner/implementation/CloudBanner';
 import Drawer from'./Drawer/implementation/Drawer';
 import ExportBox from './ExportBox/implementation/ExportBox';
 import Inspector from './Inspector/implementation/Inspector';
+import OrderDialog from './OrderDialog/implementation/OrderDialog';
 import PrintArea from './PrintArea/implementation/PrintArea';
 import ReplaceConfirm from './ReplaceConfirm/implementation/ReplaceConfirm';
 import Stage from './Stage/implementation/Stage';
@@ -43,6 +44,7 @@ export default function Studio({ designId }: { designId?: string }) {
       <ExportBox />
       <Toast />
       <ThanksNote />
+      <OrderDialog />
       <CloudBanner cloud={!!designId} />
       <ReplaceConfirm />
     </>

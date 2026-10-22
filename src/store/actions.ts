@@ -700,6 +700,12 @@ export function offerThanks() {
   setTimeout(() => S().set({ thanks: true }), THANKS_DELAY_MS);
 }
 
+/** Opens the "Order prints" form, to have the print shop print this calendar. */
+export function orderPrints() {
+  countEvent('order_open');
+  S().set({ ordering: true });
+}
+
 export function exportPNG() {
   toast('Making PNG…');
   S().set({ exporting: true });

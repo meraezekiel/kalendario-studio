@@ -33,6 +33,13 @@ export default function SupportPanel() {
           <p className="hint" data-testid="affiliate-note">Prices can change on Shopee. These are affiliate links, so buying through them costs you nothing extra.</p>
         </section>
       )}
+      {h.printOrderUrl && (
+        <section className="kit-service" data-testid="kit-order">
+          <b>No printer? Let {h.printShop} print it.</b>
+          <p className="hint">Send your design and get printed calendars{h.printShopPlace ? `, for pickup or delivery from ${h.printShopPlace}` : ''}.</p>
+          <button type="button" className="btn primary" onClick={h.order}>Order prints</button>
+        </section>
+      )}
       {h.designServiceUrl && (
         <section className="kit-service" data-testid="design-service">
           <b>Busy? I’ll design it for you.</b>

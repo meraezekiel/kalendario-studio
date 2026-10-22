@@ -1,7 +1,8 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { MONTHS } from '@/lib/calendar/constants';
 import { monthOf } from '@/lib/calendar/document';
-import { applyDesignToAll, exportPNG, goToPage, openDesignFile, printPages, saveCopy, saveDesignFile } from '@/store/actions';
+import { getSupport } from '@/lib/support/support';
+import { applyDesignToAll, exportPNG, goToPage, openDesignFile, orderPrints, printPages, saveCopy, saveDesignFile } from '@/store/actions';
 import { useCloudStore } from '@/store/useCloudStore';
 import { curPage, useStudioStore } from '@/store/useStudioStore';
 
@@ -33,6 +34,7 @@ export function useTopBarHandler() {
   // Lost access: the banner offers the copy instead.
   const denied = useCloudStore((s) => s.status.state === 'denied');
   const [sharing, setSharing] = useState(false);
+  const support = useMemo(getSupport, []);
   const st = useStudioStore.getState;
   return {
     framed,
@@ -58,5 +60,8 @@ export function useTopBarHandler() {
     printOne: () => printPages(false),
     printAll: () => printPages(true),
     png: exportPNG,
+    canOrder: !!support.printOrderUrl,
+    shop: support.printShop,
+    order: orderPrints,
   };
 }

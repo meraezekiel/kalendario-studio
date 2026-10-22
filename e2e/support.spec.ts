@@ -109,9 +109,10 @@ test.describe('Print Kit', () => {
   });
 
   test('with nothing configured there is no Print Kit tab and the note only offers to save', async ({ page }) => {
-    await preview(page, { coffeeUrl: '', gcashQr: '', designServiceUrl: '', products: [] });
+    await preview(page, { coffeeUrl: '', gcashQr: '', designServiceUrl: '', printOrderUrl: '', products: [] });
     await openStudio(page);
     await expect(page.getByRole('button', { name: 'Print Kit', exact: true })).toHaveCount(0);
+    await expect(page.getByTestId('order-prints')).toHaveCount(0);
     await exportPng(page);
     const note = page.getByTestId('thanks-note');
     await expect(note).toBeVisible();

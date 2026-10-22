@@ -7,6 +7,8 @@
  *   GCash shows when it's scanned, so people know it's really you. Leave gcashQr '' to hide "Support the dev".
  * - `designServiceUrl`: where people message you to have a calendar designed for them, e.g.
  *   'https://m.me/yourpage'. Leave it '' to hide the "I'll design it for you" offer.
+ * - `printShop`, `printShopPlace` and `printOrderUrl`: the shop that prints calendars for people, where it
+ *   is, and where its orders are sent (e.g. its Messenger). Leave printOrderUrl '' to hide "Order prints".
  *
  * The Print Kit products (affiliate links with a picture and price) aren't set here: the admin
  * manages them at /admin/products. With no products, coffee page, GCash QR or design service, the Print Kit tab stays hidden.
@@ -16,6 +18,9 @@ export interface SupportConfig {
   gcashQr: string;
   gcashName: string;
   designServiceUrl: string;
+  printShop: string;
+  printShopPlace: string;
+  printOrderUrl: string;
 }
 
 export const SUPPORT: SupportConfig = {
@@ -23,4 +28,7 @@ export const SUPPORT: SupportConfig = {
   gcashQr: '/gcash-qr.png',
   gcashName: '',
   designServiceUrl: 'https://m.me/100089328967349',
+  printShop: 'JM Craftworks',
+  printShopPlace: 'EB Magalona, Negros Occidental',
+  printOrderUrl: 'https://m.me/100089328967349',
 };

@@ -4,6 +4,7 @@ import { countEvent } from '@/lib/cloud/stats';
 import { formatPrice, priceAsOf } from '@/lib/support/products';
 import { getSupport } from '@/lib/support/support';
 import { useProductsStore } from '@/store/useProductsStore';
+import { orderPrints } from '@/store/actions';
 
 export function useSupportPanelHandler() {
   const support = useMemo(getSupport, []);
@@ -19,6 +20,10 @@ export function useSupportPanelHandler() {
       setQr(!qr);
     },
     designServiceUrl: support.designServiceUrl,
+    printOrderUrl: support.printOrderUrl,
+    printShop: support.printShop,
+    printShopPlace: support.printShopPlace,
+    order: orderPrints,
     productClicked: () => countEvent('product_click'),
     designServiceClicked: () => countEvent('design_service_click'),
     products: products.map((p) => ({

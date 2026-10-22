@@ -18,7 +18,8 @@ body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--ui)}
 button,input,select,textarea{font:inherit;color:inherit}
 .app{display:grid;grid-template-columns:68px 290px minmax(0,1fr) 300px;grid-template-rows:56px minmax(0,1fr);grid-template-areas:"top top top top" "rail drawer stage insp";height:100%}
 .top{grid-area:top;display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
-.top .brand{font:600 20px var(--display);color:var(--accent);margin-right:8px;white-space:nowrap}
+.top .brand{font:600 20px var(--display);color:var(--accent);margin-right:8px;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.top .brand::before,.auth-brand::before{content:'';width:28px;height:28px;flex:none;background:url(/logo.svg) center/contain no-repeat}
 .top .grow{flex:1}
 .top .pnav{display:flex;align-items:center;gap:6px}
 .top .plabel{font-weight:600;min-width:170px;text-align:center;white-space:nowrap}
@@ -77,7 +78,7 @@ section{display:flex;flex-direction:column}
 label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin-bottom:9px;min-width:0}
 .rl{display:flex;justify-content:space-between}.rl em{font-style:normal;color:var(--ink);font-variant-numeric:tabular-nums}
 .lab{font-size:12px;color:var(--muted);margin-bottom:4px}
-input[type=text],input[type=number],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:100%;min-width:0}
+input[type=text],input[type=number],input[type=tel],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:100%;min-width:0}
 textarea{resize:vertical;min-height:60px}
 input[type=color]{width:100%;height:32px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:2px;min-width:0}
 input[type=range]{width:100%;accent-color:var(--accent)}
@@ -291,7 +292,7 @@ a.btn.primary{color:#fff}
 .acct-item:hover,.acct-item:focus-visible{background:var(--accent-soft);color:var(--accent);outline:none}
 .auth-page{min-height:100%;display:grid;place-items:center;padding:16px}
 .auth-card{width:380px;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 20px 18px;box-shadow:0 18px 50px rgba(0,0,0,.08)}
-.auth-brand{font:600 22px var(--display);color:var(--accent);text-align:center;margin-bottom:14px}
+.auth-brand{font:600 22px var(--display);color:var(--accent);margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:10px}
 .auth-title{margin:0 0 10px;font-size:16px}
 .auth-form{display:flex;flex-direction:column;margin-top:6px}
 .auth-form input[type=email],.auth-form input[type=password]{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0;font-size:14px;color:var(--ink)}
@@ -417,3 +418,11 @@ input.cloud-name:focus-visible{outline:2px solid var(--sel);outline-offset:1px;b
 /* Wraps editing controls so a view-only design disables them all; adds no box of its own. */
 .edit-lock{display:contents}
 @media (max-width:520px){.share-form{flex-wrap:wrap}.share-form .share-email{flex-basis:100%}}
+
+/* Order prints: a short form, then save the file and send the order by Messenger */
+.modal:has(.order-form),.modal:has(.order-steps){width:420px;max-height:calc(100vh - 32px);overflow:auto}
+.order-form label.f{color:var(--ink);font-weight:600}
+.order-steps{margin:0 0 10px;padding-left:20px;display:flex;flex-direction:column;gap:12px}
+.order-steps p{margin:0 0 6px}
+.order-steps .btn{max-width:100%;white-space:normal;text-align:center;text-decoration:none}
+.order-text{font-size:12px;min-height:130px;margin-bottom:8px;color:var(--muted)}

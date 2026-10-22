@@ -56,6 +56,8 @@ interface StudioState {
   exporting: boolean;
   /** Shows the one-time thank-you note after the first export or print. */
   thanks: boolean;
+  /** Shows the "Order prints" form for having the calendar printed by the print shop. */
+  ordering: boolean;
   toast: { msg: string; n: number } | null;
   past: CalendarDoc[];
   future: CalendarDoc[];
@@ -80,7 +82,7 @@ interface StudioState {
   select: (id: string | null, day?: number | null) => void;
   /** Selects several elements; one id falls back to a normal single selection. */
   selectMany: (ids: string[]) => void;
-  set: (patch: Partial<Pick<StudioState, 'cropId' | 'armed' | 'editing' | 'tab' | 'clip' | 'guides' | 'marquee' | 'sel' | 'selDay' | 'printing' | 'exporting' | 'thanks'>>) => void;
+  set: (patch: Partial<Pick<StudioState, 'cropId' | 'armed' | 'editing' | 'tab' | 'clip' | 'guides' | 'marquee' | 'sel' | 'selDay' | 'printing' | 'exporting' | 'thanks' | 'ordering'>>) => void;
   showToast: (msg: string) => void;
   /** Starts editing a document: replaces it (when given), clears history and selection, and marks the store ready. */
   hydrate: (doc: CalendarDoc | null) => void;
@@ -105,6 +107,7 @@ export const useStudioStore = create<StudioState>()(
     printing: null,
     exporting: false,
     thanks: false,
+    ordering: false,
     toast: null,
     past: [],
     future: [],

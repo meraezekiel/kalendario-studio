@@ -2,7 +2,7 @@ import { supabase, cloudEnabled } from './supabase';
 import { toCloudError } from './transport';
 
 /** What the app counts (supabase/migrations/…_stats.sql keeps the same list). */
-export type StatEvent = 'open' | 'print' | 'export_png' | 'print_kit_open' | 'product_click' | 'design_service_click' | 'gcash_open' | `template:${string}`;
+export type StatEvent = 'open' | 'print' | 'export_png' | 'print_kit_open' | 'product_click' | 'design_service_click' | 'gcash_open' | 'order_open' | 'print_order' | `template:${string}`;
 
 declare global {
   interface Window {
