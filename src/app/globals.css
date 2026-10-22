@@ -30,8 +30,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn.coffee{display:flex;justify-content:center;text-decoration:none;background:#ffdd00;border-color:#e6c700;color:#1f1a00;font-weight:700;margin-top:10px}
 .kit-service{display:flex;flex-direction:column;gap:6px;align-items:flex-start;padding:12px;border-radius:12px;background:var(--accent-soft)}
 .kit-service b{font-size:14px}
-.kit-gcash{margin-top:10px;width:100%;background:#0070e0;border-color:#0062c4;color:#fff}
-.kit-gcash:hover{border-color:#004a94}
+.btn.kit-gcash{margin-top:10px;width:100%;background:#0070e0;border-color:#0062c4;color:#fff}
+.btn.kit-gcash:hover{border-color:#004a94}
 .kit-qr{margin:10px 0 0;text-align:center}
 .kit-qr img{width:100%;max-width:240px;border-radius:12px;border:1px solid var(--line);background:#fff}
 .kit-qr figcaption{margin-top:6px}
