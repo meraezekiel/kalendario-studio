@@ -22,5 +22,5 @@ export const SUPPORT: SupportConfig = {
   coffeeUrl: '',
   gcashQr: '/gcash-qr.png',
   gcashName: '',
-  designServiceUrl: '',
+  designServiceUrl: 'https://m.me/100089328967349',
 };
