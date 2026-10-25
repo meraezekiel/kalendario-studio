@@ -41,6 +41,23 @@ describe('sheetLayout', () => {
     expect(sheetLayout(sq3, { ...on, marks: false })!.marks).toHaveLength(0);
   });
 
+  it('starts the grid at the top-left corner', () => {
+    const L = sheetLayout(sq3, on)!;
+    expect([L.slots[0].x, L.slots[0].y]).toEqual([8, 8]);
+  });
+
+  it('fits two 8×5 in pages on A4 portrait by using a tighter edge, marks kept inside the sheet', () => {
+    const L = sheetLayout({ wmm: 203.2, hmm: 127 }, on)!;
+    expect([L.landscape, L.cols, L.rows]).toEqual([false, 1, 2]);
+    expect([L.slots[0].x, L.slots[0].y]).toEqual([3, 3]);
+    expect(L.slots[1].y + L.slots[1].h).toBeLessThanOrEqual(L.hmm - 3);
+    L.marks.forEach((m) => {
+      expect(m.x).toBeGreaterThanOrEqual(0);
+      expect(m.y).toBeGreaterThanOrEqual(0);
+      expect(m.x + m.w).toBeLessThanOrEqual(L.wmm);
+    });
+  });
+
   it('returns null when the page is bigger than the sheet', () => {
     expect(sheetLayout({ wmm: 297, hmm: 420 }, on)).toBeNull();
   });

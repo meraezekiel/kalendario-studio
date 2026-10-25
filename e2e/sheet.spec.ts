@@ -157,6 +157,35 @@ test.describe('Print several per sheet', () => {
     expect(errors).toEqual([]);
   });
 
+  test('8×5 in calendars: two months on A4 portrait, starting at the top-left', async ({ page }) => {
+    const errors = await openStudio(page);
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    await page.getByLabel('Paper').selectOption('Custom');
+    const w = page.getByLabel('Width (in)'), h = page.getByLabel('Height (in)');
+    await w.fill('8');
+    await w.press('Enter');
+    await h.fill('5');
+    await h.press('Enter');
+
+    const sec = page.getByTestId('sheet-section');
+    await sec.getByLabel('Print several on one sheet, with cut marks').check();
+    await sec.getByRole('button', { name: 'Pages in order' }).click();
+    await expect(sec.getByTestId('sheet-summary')).toHaveText('2 per sheet · 1 across × 2 down · A4, portrait');
+    await stubPrint(page, true);
+    await page.getByRole('button', { name: 'Print all' }).click();
+    await expect.poll(async () => (await printed(page)).n).toBe(1);
+    const p = await printed(page);
+    expect(p.slots.every((n) => n === 2)).toBe(true);
+    expect(p.size).toContain('210mm 297mm');
+    const first = await page.locator('#printArea .slotp').first().evaluate((e) => [(e as HTMLElement).style.left, (e as HTMLElement).style.top]);
+    expect(first).toEqual(['3mm', '3mm']);
+    await page.emulateMedia({ media: 'print' });
+    await page.locator('#printArea .sheetp').first().screenshot({ path: 'e2e/shots/54-sheet-8x5.png' });
+    await page.emulateMedia({ media: 'screen' });
+    await page.evaluate(() => dispatchEvent(new Event('afterprint')));
+    expect(errors).toEqual([]);
+  });
+
   test('a page bigger than the sheet prints normally and says why', async ({ page }) => {
     const errors = await openStudio(page);
     await page.getByRole('button', { name: 'Pages', exact: true }).click();

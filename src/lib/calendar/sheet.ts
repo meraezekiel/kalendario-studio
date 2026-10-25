@@ -6,10 +6,13 @@ export const DEFAULT_SHEET: SheetSettings = { on: false, paper: 'A4', gap: 4, ma
 
 /** Room around the grid for the printer's blank edge (and the cut marks), in mm. */
 export const sheetMargin = (marks: boolean) => (marks ? 8 : 5);
+/** The tightest edge used when it fits more pages (an 8 in page across A4), in mm. */
+const MIN_EDGE = 3;
 /** Cut marks start this far from the design and are this long, in mm. */
 const MARK_OFFSET = 1.5;
 const MARK_LEN = 4;
 const MARK_WIDTH = 0.25;
+const MIN_MARK = 1;
 
 export interface Rect {
   x: number;
@@ -33,28 +36,30 @@ export interface SheetLayout {
 const fit = (room: number, size: number, gap: number) => Math.max(0, Math.floor((room + gap) / (size + gap)));
 
 /**
- * Lays pages of `item` size (mm) in a grid on the sheet, turning the sheet
- * whichever way fits more. Null when not even one fits.
+ * Lays pages of `item` size (mm) in a grid from the sheet's top-left corner,
+ * keeping portrait unless landscape fits more. The edge shrinks to MIN_EDGE
+ * only when that fits more. Null when not even one fits.
  */
 export function sheetLayout(item: { wmm: number; hmm: number }, s: SheetSettings): SheetLayout | null {
   const [, a, b] = PAPERS[s.paper];
   const gap = Math.max(0, s.gap);
-  const M = sheetMargin(s.marks);
-  const tries = [false, true].map((landscape) => {
-    const W = landscape ? b : a;
-    const H = landscape ? a : b;
-    const cols = fit(W - 2 * M, item.wmm, gap);
-    const rows = fit(H - 2 * M, item.hmm, gap);
-    return { landscape, W, H, cols, rows, per: cols * rows };
-  });
-  const best = tries[1].per > tries[0].per ? tries[1] : tries[0];
+  const tries = [sheetMargin(s.marks), MIN_EDGE].flatMap((M) =>
+    [false, true].map((landscape) => {
+      const W = landscape ? b : a;
+      const H = landscape ? a : b;
+      const cols = fit(W - 2 * M, item.wmm, gap);
+      const rows = fit(H - 2 * M, item.hmm, gap);
+      return { M, landscape, W, H, cols, rows, per: cols * rows };
+    }),
+  );
+  const best = tries.reduce((p, t) => (t.per > p.per ? t : p));
   if (!best.per) return null;
 
-  const { W, H, cols, rows } = best;
+  const { M, W, H, cols, rows } = best;
   const gw = cols * item.wmm + (cols - 1) * gap;
   const gh = rows * item.hmm + (rows - 1) * gap;
-  const x0 = (W - gw) / 2;
-  const y0 = (H - gh) / 2;
+  const x0 = M;
+  const y0 = M;
   const slots: Rect[] = [];
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++) slots.push({ x: x0 + c * (item.wmm + gap), y: y0 + r * (item.hmm + gap), w: item.wmm, h: item.hmm });
@@ -68,13 +73,16 @@ export function sheetLayout(item: { wmm: number; hmm: number }, s: SheetSettings
       ys.add(round(t.y)).add(round(t.y + t.h));
     });
     const half = MARK_WIDTH / 2;
+    // Marks shorten to the room left before the sheet's edge, and drop when there is next to none.
+    const len = (room: number) => Math.min(MARK_LEN, room - MARK_OFFSET);
+    const top = len(y0), bottom = len(H - y0 - gh), left = len(x0), right = len(W - x0 - gw);
     xs.forEach((x) => {
-      marks.push({ x: x - half, y: y0 - MARK_OFFSET - MARK_LEN, w: MARK_WIDTH, h: MARK_LEN });
-      marks.push({ x: x - half, y: y0 + gh + MARK_OFFSET, w: MARK_WIDTH, h: MARK_LEN });
+      if (top >= MIN_MARK) marks.push({ x: x - half, y: y0 - MARK_OFFSET - top, w: MARK_WIDTH, h: top });
+      if (bottom >= MIN_MARK) marks.push({ x: x - half, y: y0 + gh + MARK_OFFSET, w: MARK_WIDTH, h: bottom });
     });
     ys.forEach((y) => {
-      marks.push({ x: x0 - MARK_OFFSET - MARK_LEN, y: y - half, w: MARK_LEN, h: MARK_WIDTH });
-      marks.push({ x: x0 + gw + MARK_OFFSET, y: y - half, w: MARK_LEN, h: MARK_WIDTH });
+      if (left >= MIN_MARK) marks.push({ x: x0 - MARK_OFFSET - left, y: y - half, w: left, h: MARK_WIDTH });
+      if (right >= MIN_MARK) marks.push({ x: x0 + gw + MARK_OFFSET, y: y - half, w: right, h: MARK_WIDTH });
     });
   }
   return { wmm: W, hmm: H, landscape: best.landscape, cols, rows, per: best.per, slots, marks };
