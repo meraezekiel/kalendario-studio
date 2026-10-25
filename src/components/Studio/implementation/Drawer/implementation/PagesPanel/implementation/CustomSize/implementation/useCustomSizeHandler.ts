@@ -1,6 +1,6 @@
 import { UNIT_MM } from '@/lib/calendar/constants';
 import type { SizeUnit } from '@/lib/calendar/types';
-import { setCustomSide } from '@/store/actions';
+import { setCustomSide, setPaperUnit } from '@/store/actions';
 import { curPage, useStudioStore } from '@/store/useStudioStore';
 
 export const UNIT_OPTIONS = [['in', 'inches'], ['cm', 'cm'], ['mm', 'mm'], ['px', 'pixels']] as const;
@@ -10,7 +10,6 @@ const shown = (mm: number, u: SizeUnit) => +(mm / UNIT_MM[u]).toFixed(u === 'mm'
 
 export function useCustomSizeHandler() {
   const paper = useStudioStore((s) => curPage(s.doc).paper);
-  const mutate = useStudioStore((s) => s.mutate);
   const unit = paper.unit ?? 'in';
   return {
     unit,
@@ -24,6 +23,6 @@ export function useCustomSizeHandler() {
       if (v === shown(paper[side] ?? 0, unit)) return;
       if (!setCustomSide(side, v)) input.value = String(shown(paper[side] ?? 0, unit));
     },
-    setUnit: (u: SizeUnit) => mutate((d) => void (curPage(d).paper.unit = u)),
+    setUnit: setPaperUnit,
   };
 }

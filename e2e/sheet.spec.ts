@@ -94,6 +94,35 @@ test.describe('Print several per sheet', () => {
     expect(errors).toEqual([]);
   });
 
+  test('a custom size set on one month applies to the whole calendar, so Print all fills two sheets', async ({ page }) => {
+    const errors = await openStudio(page);
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    await page.getByLabel('Paper').selectOption('Custom');
+    await expect(page.locator('.toast')).toContainText('on all 12 pages');
+    const w = page.getByLabel('Width (in)'), h = page.getByLabel('Height (in)');
+    await w.fill('3.5');
+    await w.press('Enter');
+    await h.fill('3.5');
+    await h.press('Enter');
+    await page.getByLabel('Unit').selectOption('cm');
+    await expect(page.getByLabel('Width (cm)')).toHaveValue('8.89');
+
+    // Another month has the same size and unit.
+    await page.getByRole('button', { name: '7 · Jul' }).click();
+    await expect(page.getByLabel('Width (cm)')).toHaveValue('8.89');
+    await expect(page.getByLabel('Height (cm)')).toHaveValue('8.89');
+
+    const sec = page.getByTestId('sheet-section');
+    await sec.getByLabel('Print several on one sheet, with cut marks').check();
+    await sec.getByRole('button', { name: 'Pages in order' }).click();
+    await expect(sec.getByTestId('sheet-summary')).toHaveText('6 per sheet · 2 across × 3 down · A4, portrait');
+    await stubPrint(page);
+    await page.getByRole('button', { name: 'Print all' }).click();
+    await expect.poll(async () => (await printed(page)).n).toBe(1);
+    expect((await printed(page)).slots).toEqual([6, 6]);
+    expect(errors).toEqual([]);
+  });
+
   test('a page bigger than the sheet prints normally and says why', async ({ page }) => {
     const errors = await openStudio(page);
     await page.getByRole('button', { name: 'Pages', exact: true }).click();
