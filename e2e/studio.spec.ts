@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { chooseTemplate, inspectorTitle, makePng, openStudio, stageEls } from './helpers';
+import { arrangeField, chooseTemplate, inches, inspectorTitle, makePng, openStudio, readPx, stageEls } from './helpers';
 
 test.describe('Kalendaryo Studio', () => {
   test('loads the pastel template as a 12-month calendar', async ({ page }) => {
@@ -53,25 +53,23 @@ test.describe('Kalendaryo Studio', () => {
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('button', { name: 'Star' }).click();
     const star = page.locator('.ph .el-shape').last();
-    const x = page.getByLabel('X', { exact: true });
-    const x0 = +(await x.inputValue());
+    const x0 = await readPx(page, 'X');
 
     const b = (await star.boundingBox())!;
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     await page.mouse.down();
     await page.mouse.move(b.x + b.width / 2 + 60, b.y + b.height / 2 + 5, { steps: 6 });
     await page.mouse.up();
-    const x1 = +(await x.inputValue());
+    const x1 = await readPx(page, 'X');
     expect(x1).toBeGreaterThan(x0 + 40);
 
-    const w = page.getByLabel('Width', { exact: true });
-    const w0 = +(await w.inputValue());
+    const w0 = await readPx(page, 'Width');
     const se = (await page.locator('.hd.se').boundingBox())!;
     await page.mouse.move(se.x + se.width / 2, se.y + se.height / 2);
     await page.mouse.down();
     await page.mouse.move(se.x + 40, se.y + 40, { steps: 6 });
     await page.mouse.up();
-    expect(+(await w.inputValue())).toBeGreaterThan(w0 + 20);
+    expect(await readPx(page, 'Width')).toBeGreaterThan(w0 + 20);
 
     const rot = (await page.locator('.hd.rot').boundingBox())!;
     const sb = (await page.getByTestId('selection').boundingBox())!;
@@ -162,10 +160,10 @@ test.describe('Kalendaryo Studio', () => {
     await page.locator('.ph .tx', { hasText: 'Our Family 2027' }).click();
     await page.keyboard.press('Control+d');
     await expect(stageEls(page)).toHaveCount(n + 1);
-    const x = page.getByLabel('X', { exact: true });
-    const x0 = +(await x.inputValue());
+    const x0 = await readPx(page, 'X');
     await page.keyboard.press('Shift+ArrowRight');
-    await expect(x).toHaveValue(String(x0 + 10));
+    // The field shows inches to 2 places, so the 10 px nudge reads back to within a px.
+    await expect.poll(async () => Math.abs((await readPx(page, 'X')) - (x0 + 10))).toBeLessThan(1);
     await page.keyboard.press('Delete');
     await expect(stageEls(page)).toHaveCount(n);
     await page.keyboard.press('Control+z');
@@ -651,8 +649,8 @@ test.describe('Kalendaryo Studio', () => {
     // Lay them out so the screenshot shows each one.
     const place = async (i: number, x: number, y: number) => {
       await art.nth(i).click({ position: { x: 5, y: 5 }, force: true });
-      await page.getByLabel('X', { exact: true }).fill(String(x));
-      await page.getByLabel('Y', { exact: true }).fill(String(y));
+      await arrangeField(page, 'X').fill(inches(x));
+      await arrangeField(page, 'Y').fill(inches(y));
     };
     await place(0, 40, 60);
     await place(1, 470, 60);

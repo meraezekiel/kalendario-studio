@@ -11,10 +11,10 @@ export default function ArrangeSection({ el }: { el: El }) {
   return (
     <Section title="Position & arrange" open={el.type !== 'cal'}>
       <div className="g2">
-        <NumField label="X" {...h.bind('x')} />
-        <NumField label="Y" {...h.bind('y')} />
-        <NumField label="Width" {...h.size('w')} />
-        <NumField label="Height" {...h.size('h')} />
+        <NumField label={`X (${h.unit})`} {...h.field('x')} />
+        <NumField label={`Y (${h.unit})`} {...h.field('y')} />
+        <NumField label={`Width (${h.unit})`} {...h.field('w')} />
+        <NumField label={`Height (${h.unit})`} {...h.field('h')} />
       </div>
       <RangeField label="Rotate" min={-180} max={180} {...h.bind('rot')} />
       <RangeField label="Transparency" min={0.05} max={1} step={0.05} {...h.bind('op')} />

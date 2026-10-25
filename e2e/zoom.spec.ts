@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openStudio } from './helpers';
+import { openStudio, readPx } from './helpers';
 
 const pct = async (page: import('@playwright/test').Page) => parseInt((await page.getByTestId('zoom-pct').textContent()) ?? '0', 10);
 
@@ -72,11 +72,10 @@ test.describe('zoom', () => {
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('button', { name: 'Star' }).click();
     const star = page.locator('.ph .el-shape').last();
-    const x = page.getByLabel('X', { exact: true });
     for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Zoom in' }).click();
     const scale = (await pct(page)) / 100;
     await star.scrollIntoViewIfNeeded();
-    const x0 = +(await x.inputValue());
+    const x0 = await readPx(page, 'X');
     const b = (await star.boundingBox())!;
     // Alt turns snapping off, so the move is exact.
     await page.keyboard.down('Alt');
@@ -85,7 +84,7 @@ test.describe('zoom', () => {
     await page.mouse.move(b.x + b.width / 2 + 120, b.y + b.height / 2, { steps: 8 });
     await page.mouse.up();
     await page.keyboard.up('Alt');
-    const moved = +(await x.inputValue()) - x0;
+    const moved = (await readPx(page, 'X')) - x0;
     expect(Math.abs(moved - 120 / scale)).toBeLessThan(3);
   });
 });

@@ -47,3 +47,12 @@ export async function chooseTemplate(page: Page, name: string) {
   await expect(page.locator('.tpl[data-armed]')).toHaveCount(1);
   await page.locator('.tpl[data-armed]').click();
 }
+
+/** Design px per inch on an A4 page (794 px across 210 mm). The X/Y/Width/Height fields show inches. */
+export const PX_PER_IN = 794 / (210 / 25.4);
+export type ArrangeName = 'X' | 'Y' | 'Width' | 'Height';
+export const arrangeField = (page: Page, name: ArrangeName) => page.getByLabel(`${name} (in)`, { exact: true });
+/** An arrange field's value converted back to page px (to within the 2-decimal rounding, about half a px). */
+export const readPx = async (page: Page, name: ArrangeName) => +(await arrangeField(page, name).inputValue()) * PX_PER_IN;
+/** Page px as the inches text a person would type. */
+export const inches = (px: number) => String(+(px / PX_PER_IN).toFixed(2));

@@ -2,9 +2,18 @@ import { type CSSProperties, type KeyboardEvent, useLayoutEffect, useRef } from 
 import { tok } from '@/lib/calendar/document';
 import { outlineShadow, type RenderCtx } from '@/lib/calendar/render';
 import type { Page, TextEl } from '@/lib/calendar/types';
-import { useStudioStore } from '@/store/useStudioStore';
+import { findEl, useStudioStore } from '@/store/useStudioStore';
 
 const JUSTIFY = { top: 'flex-start', center: 'center', bottom: 'flex-end' } as const;
+
+/** Height the text needs at the box's current width, in page px (the stage zoom does not affect it). */
+export function textHeight(tx: HTMLElement) {
+  tx.style.height = 'auto';
+  // scrollHeight also counts lines that spill out of a tight line-height.
+  const h = Math.max(tx.offsetHeight, tx.scrollHeight);
+  tx.style.height = '';
+  return Math.ceil(h);
+}
 
 export function useTextElementHandler(el: TextEl, page: Page, ctx: RenderCtx, editing: boolean) {
   const ref = useRef<HTMLDivElement>(null);
@@ -18,6 +27,25 @@ export function useTextElementHandler(el: TextEl, page: Page, ctx: RenderCtx, ed
     document.getSelection()?.selectAllChildren(n);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
+
+  // On the stage, a box shorter than its text grows, so the selection and Height match what is seen.
+  const display = tok(el.text, ctx.year, page);
+  useLayoutEffect(() => {
+    const n = ref.current;
+    if (!ctx.edit || editing || !n) return;
+    const fit = () => {
+      const need = textHeight(n);
+      if (need <= el.h) return;
+      useStudioStore.getState().mutate((d) => {
+        const e = findEl(d, el.id);
+        if (e) e.h = need;
+      }, { history: false });
+    };
+    fit();
+    // Web fonts can arrive after the first layout and change the text's size.
+    document.fonts.addEventListener('loadingdone', fit);
+    return () => document.fonts.removeEventListener('loadingdone', fit);
+  }, [ctx.edit, editing, display, el]);
 
   const commit = () => {
     const n = ref.current;
@@ -55,6 +83,5 @@ export function useTextElementHandler(el: TextEl, page: Page, ctx: RenderCtx, ed
     textShadow: shadows || undefined,
     background: el.bg || undefined,
   };
-  const display = tok(el.text, ctx.year, page);
   return { ref, style, display, commit, onKeyDown };
 }

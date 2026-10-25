@@ -17,5 +17,5 @@ export default function TextElement({ el, page, ctx, editing }: Props) {
   if (editing) {
     return <div key="edit" ref={ref} className="tx" style={style} contentEditable suppressContentEditableWarning onBlur={commit} onKeyDown={onKeyDown} data-testid="text-editor" />;
   }
-  return <div key="view" className="tx" style={style}>{display}</div>;
+  return <div key="view" ref={ref} className="tx" style={style}>{display}</div>;
 }

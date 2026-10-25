@@ -7,11 +7,13 @@ import type { CalendarDoc, El } from '@/lib/calendar/types';
 import { clamp, r1 } from '@/lib/calendar/utils';
 import { boundsOf, placeAsset } from '@/store/actions';
 import { curPage, findEl, type Guide, type PickTarget, selIds, useStudioStore } from '@/store/useStudioStore';
+import { textHeight } from '@/components/PageView/implementation/ElementView/implementation/TextElement/implementation/useTextElementHandler';
 import { useDoubleClickHandler } from './useDoubleClickHandler';
 
 type Drag =
   | { mode: 'move'; id: string; sx: number; sy: number; x0: number; y0: number; moved: boolean; cell: number | null; started: boolean }
-  | { mode: 'rs'; id: string; h: string; sx: number; sy: number; x0: number; y0: number; w0: number; h0: number; size0: number; started: boolean }
+  /** `minH`: a text box can't be made shorter than its text with the top/bottom handles. */
+  | { mode: 'rs'; id: string; h: string; sx: number; sy: number; x0: number; y0: number; w0: number; h0: number; size0: number; minH: number; started: boolean }
   | { mode: 'rot'; id: string; started: boolean }
   | { mode: 'pan'; id: string; sx: number; sy: number; px: number; py: number; iw: number; ih: number; bw: number; bh: number; started: boolean }
   /** Moves every selected element; `collapse` is the element to select alone if this turns out to be a plain click. */
@@ -51,6 +53,13 @@ function snapMove(skip: string[], w: number, h: number, nx: number, ny: number, 
   if (bx) { nx += bx.d; guides.push({ v: bx.t }); }
   if (by) { ny += by.d; guides.push({ h: by.t }); }
   return [nx, ny, guides];
+}
+
+/** Keeps at least a grabbable strip of a dragged box on the page, so it can't be lost off the edge. */
+function keepOnPage(w: number, h: number, nx: number, ny: number): [number, number] {
+  const D = dims(curPage(S().doc));
+  const mx = Math.min(24, w), my = Math.min(24, h);
+  return [clamp(nx, mx - w, D.W - mx), clamp(ny, my - h, D.H - my)];
 }
 
 export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phRef: RefObject<HTMLDivElement | null>, scale: number) {
@@ -114,9 +123,10 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
     if (hd && el0) {
       e.preventDefault();
       wrap.setPointerCapture(e.pointerId);
+      const tx = el0.type === 'text' ? phRef.current!.querySelector<HTMLElement>(`.el[data-id="${el0.id}"] .tx`) : null;
       drag.current = hd.dataset.h === 'rot'
         ? { mode: 'rot', id: el0.id, started: false }
-        : { mode: 'rs', id: el0.id, h: hd.dataset.h!, sx: e.clientX, sy: e.clientY, x0: el0.x, y0: el0.y, w0: el0.w, h0: el0.h, size0: el0.type === 'text' ? el0.size : 0, started: false };
+        : { mode: 'rs', id: el0.id, h: hd.dataset.h!, sx: e.clientX, sy: e.clientY, x0: el0.x, y0: el0.y, w0: el0.w, h0: el0.h, size0: el0.type === 'text' ? el0.size : 0, minH: tx ? textHeight(tx) : 6, started: false };
       return;
     }
 
@@ -188,6 +198,7 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
       d.moved = true;
       let nx = d.box.x + dx, ny = d.box.y + dy, guides: Guide[] = [];
       if (!e.altKey) [nx, ny, guides] = snapMove(d.ids, d.box.w, d.box.h, nx, ny, scale);
+      [nx, ny] = keepOnPage(d.box.w, d.box.h, nx, ny);
       const mx = Math.round(nx - d.box.x), my = Math.round(ny - d.box.y);
       liveDoc(d, (doc) => {
         for (const id of d.ids) {
@@ -208,6 +219,7 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
       d.moved = true;
       let nx = d.x0 + dx, ny = d.y0 + dy, guides: Guide[] = [];
       if (!e.altKey && !(el.rot % 360)) [nx, ny, guides] = snapMove([el.id], el.w, el.h, nx, ny, scale);
+      [nx, ny] = keepOnPage(el.w, el.h, nx, ny);
       live(d, (x) => { x.x = Math.round(nx); x.y = Math.round(ny); });
       S().set({ guides });
     } else if (d.mode === 'rs') {
@@ -215,8 +227,9 @@ export function usePointerHandler(wrapRef: RefObject<HTMLDivElement | null>, phR
       const a = ((el.rot || 0) * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a);
       const lx = dx * cos + dy * sin, ly = -dx * sin + dy * cos;
       const hx = d.h.includes('e') ? 1 : d.h.includes('w') ? -1 : 0, hy = d.h.includes('s') ? 1 : d.h.includes('n') ? -1 : 0;
-      let nw = Math.max(12, d.w0 + hx * lx), nh = Math.max(6, d.h0 + hy * ly);
       const corner = !!(hx && hy);
+      // Side handles keep the text's width, so its measured height is the floor; corners scale the text with the box.
+      let nw = Math.max(12, d.w0 + hx * lx), nh = Math.max(corner ? 6 : d.minH, d.h0 + hy * ly);
       const keep = corner && (e.shiftKey || el.type === 'image' || el.type === 'text' || (el.type === 'shape' && ASPECT_SHAPES.includes(el.shape)) || (el.type === 'graphic' && !findGraphic(el.key)?.stretch));
       if (keep) { const k = Math.max(nw / d.w0, nh / d.h0); nw = Math.max(12, d.w0 * k); nh = Math.max(6, d.h0 * k); }
       const dw = nw - d.w0, dh = nh - d.h0, clx = (hx * dw) / 2, cly = (hy * dh) / 2;
