@@ -1,6 +1,6 @@
 import { UNIT_MM } from '@/lib/calendar/constants';
 import type { SizeUnit } from '@/lib/calendar/types';
-import { setCustomSide, setPaperUnit } from '@/store/actions';
+import { setCustomSide, setPaper, setPaperUnit } from '@/store/actions';
 import { curPage, useStudioStore } from '@/store/useStudioStore';
 
 export const UNIT_OPTIONS = [['in', 'inches'], ['cm', 'cm'], ['mm', 'mm'], ['px', 'pixels']] as const;
@@ -20,7 +20,8 @@ export function useCustomSizeHandler() {
     /** Applies the typed size, or puts the old one back when it is out of range. */
     commit: (side: 'cw' | 'ch', input: HTMLInputElement) => {
       const v = +input.value;
-      if (v === shown(paper[side] ?? 0, unit)) return;
+      // Same size again: nothing changes here, but months left on another size are brought along.
+      if (v === shown(paper[side] ?? 0, unit)) return setPaper({});
       if (!setCustomSide(side, v)) input.value = String(shown(paper[side] ?? 0, unit));
     },
     setUnit: setPaperUnit,

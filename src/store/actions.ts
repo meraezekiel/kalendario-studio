@@ -12,7 +12,7 @@ import { designFileName, DESIGN_EXT, parseDesign, serializeDesign } from '@/lib/
 import { DEFAULT_SHEET, sheetLayout } from '@/lib/calendar/sheet';
 import { giveCal, TEMPLATES } from '@/lib/calendar/templates';
 import { markThanksSeen, thanksSeen } from '@/lib/support/support';
-import type { CalEl, CalendarDoc, El, Page, ShapeEl, ShapeKind, SheetSettings, SizeUnit } from '@/lib/calendar/types';
+import type { CalEl, El, Page, ShapeEl, ShapeKind, SheetSettings, SizeUnit } from '@/lib/calendar/types';
 import { clamp, clone, uid } from '@/lib/calendar/utils';
 import { canDeleteCloudPhoto, cloudPath, deletePhoto, embedPhotos, photosOf, PhotoTooLarge, UnreadableImage, uploadPhoto } from '@/lib/cloud/photos';
 import { importDoc } from '@/lib/cloud/importDoc';
@@ -505,28 +505,30 @@ export function setYear(y: number): void | Promise<void> {
   return continuing ? set() : confirmed(set);
 }
 
-/** The current page and every other page on the same paper: a paper change applies to all of them, so a calendar stays one size. */
-function samePaperPages(d: CalendarDoc): Page[] {
-  const key = JSON.stringify(curPage(d).paper);
-  return d.pages.filter((p) => JSON.stringify(p.paper) === key);
-}
-
-/** Changes the paper (of every page that shares it) and stretches each design vertically to the new height. */
+/**
+ * Changes the paper of the whole calendar: the current page's paper with `patch` applied goes on every page,
+ * and each design is stretched vertically to its new height. This also mends designs whose months ended up
+ * on different sizes (setting the same size again brings the other months along).
+ */
 export function setPaper(patch: Partial<Page['paper']>) {
-  let n = 0, stretched = false;
+  let changed = 0, stretched = false;
   S().mutate((d) => {
-    const group = samePaperPages(d);
-    n = group.length;
-    group.forEach((pg) => {
+    const cur = curPage(d);
+    const was = dims(cur);
+    const paper = clone(cur.paper);
+    if (patch.size === 'Custom' && !paper.cw) Object.assign(paper, { cw: was.wmm, ch: was.hmm, unit: paper.unit ?? 'in' });
+    if (paper.size === 'Custom' && patch.o && patch.o !== paper.o && paper.cw && paper.ch) {
+      // A custom page turns by swapping its width and height.
+      [paper.cw, paper.ch] = [paper.ch, paper.cw];
+    }
+    Object.assign(paper, patch);
+    if (paper.size === 'Custom' && paper.cw && paper.ch) paper.o = paper.cw > paper.ch ? 'l' : 'p';
+    const key = JSON.stringify(paper);
+    d.pages.forEach((pg) => {
+      if (JSON.stringify(pg.paper) === key) return;
       const oldH = dims(pg).H;
-      const was = dims(pg);
-      if (patch.size === 'Custom' && !pg.paper.cw) Object.assign(pg.paper, { cw: was.wmm, ch: was.hmm, unit: pg.paper.unit ?? 'in' });
-      if (pg.paper.size === 'Custom' && patch.o && patch.o !== pg.paper.o && pg.paper.cw && pg.paper.ch) {
-        // A custom page turns by swapping its width and height.
-        [pg.paper.cw, pg.paper.ch] = [pg.paper.ch, pg.paper.cw];
-      }
-      Object.assign(pg.paper, patch);
-      if (pg.paper.size === 'Custom' && pg.paper.cw && pg.paper.ch) pg.paper.o = pg.paper.cw > pg.paper.ch ? 'l' : 'p';
+      pg.paper = clone(paper);
+      changed++;
       const r = dims(pg).H / oldH;
       if (r !== 1) {
         stretched = true;
@@ -537,14 +539,14 @@ export function setPaper(patch: Partial<Page['paper']>) {
       }
     });
   });
-  const all = n > 1 ? ` on all ${n} pages` : '';
-  if (stretched) toast(`Paper changed${all}; designs stretched to fit. Press Undo to go back.`);
-  else if (n > 1) toast(`Paper changed${all}.`);
+  if (!changed) return;
+  const where = S().doc.pages.length > 1 ? ' on all pages' : '';
+  toast(stretched ? `Paper changed${where}; designs stretched to fit. Press Undo to go back.` : `Paper changed${where}.`);
 }
 
-/** Shows a custom page's size in another unit (on every page that shares its paper). */
+/** Shows the custom size in another unit (the unit is part of the whole calendar's paper). */
 export function setPaperUnit(u: SizeUnit) {
-  S().mutate((d) => samePaperPages(d).forEach((p) => void (p.paper.unit = u)));
+  setPaper({ unit: u });
 }
 
 /** Sets one side of a custom page, given in the page's unit. */
@@ -568,7 +570,7 @@ export function printPages(all: boolean) {
   if (!all) return S().set({ printing: [doc.cur] });
   const key = JSON.stringify(pg.paper);
   const idx = doc.pages.map((p, i) => (JSON.stringify(p.paper) === key ? i : -1)).filter((i) => i >= 0);
-  if (idx.length < doc.pages.length) toast(`Printing the ${idx.length} pages that use ${dims(pg).label}. Go to a page with the other paper size and print again for the rest.`);
+  if (idx.length < doc.pages.length) toast(`Printing the ${idx.length} pages that use ${dims(pg).label}. The other pages are on a different paper: set the paper in Pages again to put every page on this size.`);
   S().set({ printing: idx });
 }
 

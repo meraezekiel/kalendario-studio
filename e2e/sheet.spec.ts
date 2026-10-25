@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
 import { chooseTemplate, openStudio } from './helpers';
 
@@ -98,7 +99,7 @@ test.describe('Print several per sheet', () => {
     const errors = await openStudio(page);
     await page.getByRole('button', { name: 'Pages', exact: true }).click();
     await page.getByLabel('Paper').selectOption('Custom');
-    await expect(page.locator('.toast')).toContainText('on all 12 pages');
+    await expect(page.locator('.toast')).toContainText('Paper changed on all pages');
     const w = page.getByLabel('Width (in)'), h = page.getByLabel('Height (in)');
     await w.fill('3.5');
     await w.press('Enter');
@@ -116,6 +117,39 @@ test.describe('Print several per sheet', () => {
     await sec.getByLabel('Print several on one sheet, with cut marks').check();
     await sec.getByRole('button', { name: 'Pages in order' }).click();
     await expect(sec.getByTestId('sheet-summary')).toHaveText('6 per sheet · 2 across × 3 down · A4, portrait');
+    await stubPrint(page);
+    await page.getByRole('button', { name: 'Print all' }).click();
+    await expect.poll(async () => (await printed(page)).n).toBe(1);
+    expect((await printed(page)).slots).toEqual([6, 6]);
+    expect(errors).toEqual([]);
+  });
+
+  test('a design saved with only January at 3.5 in: typing the same size again brings the other months along', async ({ page }) => {
+    const errors = await openStudio(page);
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    // Make such a design file: January custom 3.5×3.5 in, the other months still A4.
+    const dl = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Save design file' }).click();
+    const saved = JSON.parse(readFileSync(await (await dl).path(), 'utf8'));
+    saved.doc.pages[0].paper = { size: 'Custom', o: 'p', cw: 88.9, ch: 88.9, unit: 'in' };
+    expect(saved.doc.pages[1].paper.size).toBe('A4');
+    const open = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Open design file' }).click();
+    await (await open).setFiles({ name: 'mixed.kalendaryo', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved)) });
+    await expect(page.locator('.toast')).toContainText('Opened');
+
+    const w = page.getByLabel('Width (in)');
+    await expect(w).toHaveValue('3.5');
+    await w.fill('3.5');
+    await w.press('Enter');
+    await expect(page.locator('.toast')).toContainText('Paper changed on all pages');
+    await page.getByRole('button', { name: '12 · Dec' }).click();
+    await expect(page.getByLabel('Paper')).toHaveValue('Custom');
+    await expect(page.getByLabel('Width (in)')).toHaveValue('3.5');
+
+    const sec = page.getByTestId('sheet-section');
+    await sec.getByLabel('Print several on one sheet, with cut marks').check();
+    await sec.getByRole('button', { name: 'Pages in order' }).click();
     await stubPrint(page);
     await page.getByRole('button', { name: 'Print all' }).click();
     await expect.poll(async () => (await printed(page)).n).toBe(1);
