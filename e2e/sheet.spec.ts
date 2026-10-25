@@ -186,6 +186,34 @@ test.describe('Print several per sheet', () => {
     expect(errors).toEqual([]);
   });
 
+  test('elements an extension adds to the page are left out of the print, so Chrome never shrinks it', async ({ page }) => {
+    const errors = await openStudio(page);
+    await chooseTemplate(page, 'Mini 3×3 in');
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    await page.getByTestId('sheet-section').getByLabel('Print several on one sheet, with cut marks').check();
+    await page.evaluate(() => {
+      for (const host of [document.body, document.documentElement]) {
+        const ext = document.createElement('div');
+        ext.className = 'some-extension';
+        ext.style.cssText = 'width:1000px;height:20px';
+        host.appendChild(ext);
+      }
+    });
+    await stubPrint(page, true);
+    await page.getByRole('button', { name: 'Print page' }).click();
+    await expect.poll(async () => (await printed(page)).n).toBe(1);
+    await page.emulateMedia({ media: 'print' });
+    await page.setViewportSize({ width: 794, height: 1123 });
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(wide).toBeLessThanOrEqual(794);
+    await expect(page.locator('.some-extension')).toHaveCount(2);
+    await expect(page.locator('.some-extension').first()).toBeHidden();
+    await expect(page.locator('#printArea .sheetp').first()).toBeVisible();
+    await page.emulateMedia({ media: 'screen' });
+    await page.evaluate(() => dispatchEvent(new Event('afterprint')));
+    expect(errors).toEqual([]);
+  });
+
   test('a page bigger than the sheet prints normally and says why', async ({ page }) => {
     const errors = await openStudio(page);
     await page.getByRole('button', { name: 'Pages', exact: true }).click();

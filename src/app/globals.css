@@ -219,8 +219,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
 #printArea{display:none}
 @media print{
-  html,body{background:#fff!important;height:auto}
+  html,body{background:#fff!important;height:auto;width:auto!important;min-width:0!important;margin:0!important;padding:0!important}
   .app,.toast,.thanks,.cloud-banner{display:none!important}
+  /* Anything else (browser extensions add their own elements) could be wider than the paper, and Chrome would shrink the whole print to fit it. */
+  html>:not(body),body>:not(#printArea){display:none!important}
   #printArea{display:block}
   .sheetp{overflow:hidden;break-after:page;page-break-after:always}
   .sheetp:last-child{break-after:auto;page-break-after:auto}
