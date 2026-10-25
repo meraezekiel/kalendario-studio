@@ -180,10 +180,18 @@ test('usage shows in the account menu after upload', async ({ browser }) => {
   const after = mb(await usageText(page));
   expect(after).toBeGreaterThan(before);
 
-  // Removing a photo nothing uses gives its space back (the stored file goes, then its row).
-  const freed = page.waitForResponse((r) => r.url().includes('/rest/v1/photos') && r.request().method() === 'DELETE');
+  // Removing it from the design keeps it in the library (still counted), newest first...
+  const lib = page.getByTestId('library').locator('.t');
+  const others = await lib.count();
   await page.getByTestId('tray').locator('.t').first().getByRole('button', { name: 'Remove photo' }).click();
+  await expect(lib).toHaveCount(others + 1);
+  expect(mb(await usageText(page))).toBe(after);
+  // ...deleting it there (✕, then again to confirm) gives its space back: the stored file goes, then its row.
+  const freed = page.waitForResponse((r) => r.url().includes('/rest/v1/photos') && r.request().method() === 'DELETE');
+  await lib.first().getByRole('button', { name: 'Delete photo' }).click();
+  await lib.first().getByRole('button', { name: 'Delete for good' }).click();
   expect((await freed).ok()).toBe(true);
+  await expect(lib).toHaveCount(others);
   expect(mb(await usageText(page))).toBeLessThan(after);
   expect(errors).toEqual([]);
   await ctx.close();
@@ -232,5 +240,59 @@ test('adding a photo while offline says so and adds nothing', async ({ browser }
   await expect(page.locator('.toast')).toHaveText("You're offline. Photos can be added once you're back online.");
   await expect(page.getByTestId('tray')).toHaveCount(0);
   await ctx.setOffline(false);
+  await ctx.close();
+});
+
+test('one photo serves every design: it shows under More of your photos, and adding or re-uploading it stores nothing new', async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: ownerState });
+  const page = await ctx.newPage();
+  const errors = watchErrors(page);
+  const file = { name: 'shared.png', mimeType: 'image/png', buffer: await makePng(page, '#3d5a80') };
+  let stored = 0;
+  page.on('request', (r) => {
+    if (r.url().includes('/storage/v1/object/photos/') && r.method() === 'POST') stored++;
+  });
+
+  // Design A: upload it.
+  const a = await newDesign(page);
+  await uploadToTray(page, file);
+  expect(stored).toBe(1);
+  const used = mb(await usageText(page));
+
+  // Design B: it's there to add (newest first, after any photos earlier tests left), and adding it stores nothing.
+  await newDesign(page);
+  await page.getByRole('button', { name: 'Photos', exact: true }).click();
+  const lib = page.getByTestId('library').locator('.t');
+  await expect(lib.first()).toHaveAttribute('style', /blob:/);
+  const inLibrary = await lib.count();
+  await page.screenshot({ path: 'e2e/shots/53-photo-library.png' });
+  await lib.first().getByRole('button', { name: 'Add to this design' }).click();
+  await expect(page.getByTestId('tray').locator('.t')).toHaveCount(1);
+  await expect(lib).toHaveCount(inLibrary - 1);
+  await page.getByTestId('tray').locator('.t').first().getByRole('button', { name: 'Add to page' }).click();
+  await expect(cloudPhotos(page)).toHaveCount(1);
+
+  // Uploading the same file again here: nothing is sent and it doesn't show twice.
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Upload photos' }).click();
+  await (await chooser).setFiles([file]);
+  await expect(page.locator('.toast')).toContainText('1 photo added');
+  await expect(page.getByTestId('tray').locator('.t')).toHaveCount(1);
+  expect(stored).toBe(1);
+  expect(mb(await usageText(page))).toBe(used);
+
+  // Design C: deleting it is refused while A and B use it.
+  await newDesign(page);
+  await page.getByRole('button', { name: 'Photos', exact: true }).click();
+  await lib.first().getByRole('button', { name: 'Delete photo' }).click();
+  await lib.first().getByRole('button', { name: 'Delete for good' }).click();
+  await expect(page.locator('.toast')).toHaveText('A design still uses this photo. Remove it from that design first.');
+  await expect(lib).toHaveCount(inLibrary);
+
+  // Design A still shows it after a reload.
+  await openDesign(page, a);
+  await page.getByRole('button', { name: 'Photos', exact: true }).click();
+  await expect(page.getByTestId('tray').locator('.t[style*="blob:"]')).toHaveCount(1);
+  expect(errors).toEqual([]);
   await ctx.close();
 });

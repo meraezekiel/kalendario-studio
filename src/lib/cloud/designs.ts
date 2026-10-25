@@ -96,15 +96,18 @@ export async function renameDesign(id: string, name: string): Promise<void> {
   if (!(rows as unknown[] | null)?.length) throw new CloudError('denied', 'design not found');
 }
 
-/** Deletes a design: its stored photos first (their rows refuse to go while the files exist), then the row. */
+/**
+ * Deletes a design. Its library photos stay (other designs may use them; the design's links to them
+ * go with it). Photos still stored in the design itself (added by a tab from before the library) go
+ * first: their files, since their rows refuse to go while the files exist.
+ */
 export async function removeDesign(id: string): Promise<void> {
   const store = supabase().storage.from(BUCKET);
-  for (;;) {
-    const files = await run(store.list(id, { limit: 100 }));
-    const paths = (files ?? []).filter((f) => f.id).map((f) => `${id}/${f.name}`);
-    if (!paths.length) break;
-    const gone = await run(store.remove(paths));
-    // Storage reports files it may not delete as simply not deleted; stop instead of looping.
+  const legacy = (await run(supabase().from('photos').select('path').eq('design_id', id))) as { path: string }[] | null;
+  const paths = (legacy ?? []).map((r) => r.path);
+  for (let i = 0; i < paths.length; i += 100) {
+    const gone = await run(store.remove(paths.slice(i, i + 100)));
+    // Storage reports files it may not delete as simply not deleted.
     if (!gone?.length) throw new CloudError('denied', 'could not delete the design photos');
   }
   const rows = await run(supabase().from('designs').delete().eq('id', id).select('id'));

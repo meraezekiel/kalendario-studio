@@ -18,12 +18,15 @@ vi.mock('./photos', async (orig) => {
       if (err) throw err;
       return { src: `sb:${id}/${f.name.slice(-4)}.jpg`, w: 10, h: 5 };
     },
-    copyPhoto: async (from: string, o: { designId: string }) => {
+    libraryCopyOf: async (from: string) => {
       calls.push(`copy ${from}`);
       const err = photos.failOn.get(from);
       if (err) throw err;
-      return `sb:${o.designId}/copy-${from.split('/')[1]}`;
+      return `lib/me/copy-${from.split('/')[1]}`;
     },
+    // Photos under 'lib/me/' are already in this account's library.
+    isMyLibraryPhoto: async (path: string) => path.startsWith('lib/me/'),
+    linkPhoto: async (id: string, path: string) => void calls.push(`link ${id} ${path}`),
   };
 });
 vi.mock('./designs', () => ({
@@ -73,17 +76,23 @@ describe('importDoc', () => {
       s: { src: '@sample', w: 1, h: 1 },
     });
 
-  it('creates the design, uploads data photos and copies cloud ones into it, then writes the state', async () => {
+  it("creates the design, uploads data photos and copies others' cloud photos into the library, then writes the state", async () => {
     const progress: string[] = [];
     const id = await importDoc(doc(), 'Mine', (d, t) => progress.push(`${d}/${t}`));
     expect(id).toBe('new');
-    expect(calls).toEqual(['create Mine 1', `upload data:image/jpeg;base64,${b64(400)}AAA1`, 'copy other/p.jpg', 'write new']);
+    expect(calls).toEqual(['create Mine 1', `upload data:image/jpeg;base64,${b64(400)}AAA1`, 'copy other/p.jpg', 'link new lib/me/copy-p.jpg', 'write new']);
     expect(progress).toEqual(['0/2', '1/2', '2/2']);
     expect(written!.assets.a).toEqual({ src: 'sb:new/AAA1.jpg', w: 10, h: 5 });
     expect(written!.assets.b.src).toBe('sb:new/AAA1.jpg');
-    expect(written!.assets.c.src).toBe('sb:new/copy-p.jpg');
+    expect(written!.assets.c.src).toBe('sb:lib/me/copy-p.jpg');
     expect(written!.assets.s.src).toBe('@sample');
     expect(written!.tray).toEqual(['a', 'b', 'c', 's']);
+  });
+
+  it('links a photo already in the library instead of copying it', async () => {
+    await importDoc(mkDoc({ c: { src: 'sb:lib/me/p.jpg', w: 1, h: 1 } }), 'Mine');
+    expect(calls).toEqual(['create Mine 0', 'link new lib/me/p.jpg', 'write new']);
+    expect(written!.assets.c.src).toBe('sb:lib/me/p.jpg');
   });
 
   it('throws limit before creating anything when the photos would not fit', async () => {

@@ -6,6 +6,7 @@ import { dirtyDesigns, type DirtyDesign, forgetDirty, isDirty } from '@/lib/clou
 import { forgetLocalCopies } from '@/lib/cloud/localCopies';
 import { cloudEnabled, supabase } from '@/lib/cloud/supabase';
 import { saveAll, useCloudStore } from './useCloudStore';
+import { useLibraryStore } from './useLibraryStore';
 import { useMyTemplatesStore } from './useMyTemplatesStore';
 import { usePhotoUrlStore } from './usePhotoUrlStore';
 
@@ -67,6 +68,7 @@ export const SAVE_WAIT_MS = 15_000;
 /** Removes the signed-out account's data from this browser. The signed-out local design stays (it isn't account data). */
 async function forgetAccountData() {
   usePhotoUrlStore.getState().clear();
+  useLibraryStore.getState().clear();
   useMyTemplatesStore.setState({ list: [], loaded: false, owner: null });
   forgetDirty();
   await forgetLocalCopies();

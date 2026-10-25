@@ -1,6 +1,6 @@
 import type { Asset, CalendarDoc } from '../calendar/types';
 import { createDesign, removeDesign, writeNewDesign } from './designs';
-import { cloudPath, copyPhoto, dataUrlFile, isCloudSrc, photoUsage, PhotoTooLarge, UnreadableImage, uploadPhoto, uploadPhotoTo, type PhotoOwner } from './photos';
+import { cloudPath, copyPhoto, dataUrlFile, isCloudSrc, isMyLibraryPhoto, libraryCopyOf, linkPhoto, photoUsage, PhotoTooLarge, UnreadableImage, uploadPhoto, uploadPhotoTo, type PhotoOwner } from './photos';
 import { PHOTO_SPACE_BYTES } from './limits';
 import { CloudError } from './transport';
 
@@ -31,8 +31,9 @@ export async function checkSpace(bytes: number): Promise<void> {
 const onlyThisPhoto = (e: unknown) => e instanceof PhotoTooLarge || e instanceof UnreadableImage || (e instanceof CloudError && e.code === 'denied');
 
 /**
- * Puts every data-URL and cloud photo of `assets` into `owner`'s folder: data URLs are uploaded,
- * cloud photos copied. Returns the assets with their new sources (a photo that couldn't be read is
+ * Puts every data-URL and cloud photo of `assets` where `owner` can keep it: data URLs are uploaded
+ * and cloud photos copied (for a design, into the account's library and linked; one already in the
+ * library is just linked). Returns the assets with their new sources (a photo that couldn't be read is
  * left out, so what showed it becomes an empty frame) and how many were left out. Stops at the
  * first account or connection failure, throwing it; `stored` then lists the paths already stored.
  */
@@ -51,6 +52,11 @@ export async function moveAssets(
       if (isDataSrc(src)) {
         const file = dataUrlFile(src);
         a = 'designId' in owner ? await uploadPhoto(owner.designId, file) : await uploadPhotoTo(owner, file);
+      } else if ('designId' in owner) {
+        const from = cloudPath(src)!;
+        const path = (await isMyLibraryPhoto(from)) ? from : await libraryCopyOf(from);
+        await linkPhoto(owner.designId, path);
+        a = { src: 'sb:' + path, w: 0, h: 0 };
       } else {
         a = { src: await copyPhoto(cloudPath(src)!, owner), w: 0, h: 0 };
       }
@@ -95,7 +101,7 @@ export async function importDoc(
     if (skipped) onSkip?.(skipped);
     return id;
   } catch (e) {
-    // Removing the design also removes the photos already stored in it.
+    // The photos already stored stay in the library (a retry finds them instead of storing them again).
     await removeDesign(id).catch(() => {});
     throw e;
   }

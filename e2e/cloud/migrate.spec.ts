@@ -248,7 +248,7 @@ test('saved template appears on a second context and applies with its photo', as
   const b = await browser.newContext({ storageState: mainState });
   const pb = await b.newPage();
   errors.push(...watchErrors(pb));
-  const id = await newDesign(pb);
+  await newDesign(pb);
   await pb.getByRole('button', { name: 'Templates' }).click();
   const card = pb.getByTestId('my-templates').locator('.mytpl', { hasText: 'Cloud tpl' });
   await expect(card).toBeVisible();
@@ -259,7 +259,8 @@ test('saved template appears on a second context and applies with its photo', as
   await pb.getByTestId('my-templates').locator('.tpl[data-armed]').click();
   const res = await copied;
   expect(res.ok()).toBe(true);
-  expect(res.request().postDataJSON().destinationKey).toMatch(new RegExp(`^${id}/`));
+  // The template's photo is copied into the account's photo library (once), and the design links it.
+  expect(res.request().postDataJSON().destinationKey).toMatch(/^lib\/[0-9a-f-]{36}\//);
   await expect(pb.locator('.ph .tx', { hasText: 'Template heading' })).toBeVisible();
   await expect(cloudPhotos(pb)).toHaveCount(1);
   await expect(syncState(pb)).toHaveText('Saved');

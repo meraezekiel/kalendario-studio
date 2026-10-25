@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TEMPLATES } from '../calendar/templates';
 import type { CalendarDoc } from '../calendar/types';
 import { hasTransparency } from '../calendar/samplePhoto';
-import { canDeleteCloudPhoto, cloudPath, embedPhotos, isCloudSrc, photoError, photosOf, PhotoTooLarge } from './photos';
+import { cloudPath, embedPhotos, hashFile, isCloudSrc, photoError, photoLeftUnused, photosOf, PhotoTooLarge } from './photos';
 import { CloudError } from './transport';
 
 // Storage that has one photo ('d1/ok.jpg') and refuses every other.
@@ -52,31 +52,27 @@ describe('photosOf', () => {
   });
 });
 
-describe('canDeleteCloudPhoto', () => {
+describe('photoLeftUnused', () => {
   const doc = mkDoc({
     own: { src: 'sb:d1/one.jpg', w: 1, h: 1 },
     shared1: { src: 'sb:d1/two.jpg', w: 1, h: 1 },
     shared2: { src: 'sb:d1/two.jpg', w: 1, h: 1 },
-    other: { src: 'sb:d2/three.jpg', w: 1, h: 1 }, // came in with a template saved from design d2
+    lib: { src: 'sb:lib/u1/three.jpg', w: 1, h: 1 },
     local: { src: 'data:image/png;base64,AAAA', w: 1, h: 1 },
   });
 
-  it("is true for this design's own photo that no other asset shares", () => {
-    expect(canDeleteCloudPhoto(doc, 'own', 'd1')).toBe(true);
+  it('is the path of a cloud photo no other asset here shows, wherever it is stored', () => {
+    expect(photoLeftUnused(doc, 'own')).toBe('d1/one.jpg');
+    expect(photoLeftUnused(doc, 'lib')).toBe('lib/u1/three.jpg');
   });
 
-  it("is false for another design's photo", () => {
-    expect(canDeleteCloudPhoto(doc, 'other', 'd1')).toBe(false);
-    expect(canDeleteCloudPhoto(doc, 'own', 'd10')).toBe(false); // prefix must end at the slash
+  it('is null while another asset has the same source', () => {
+    expect(photoLeftUnused(doc, 'shared1')).toBeNull();
   });
 
-  it('is false while another asset has the same source', () => {
-    expect(canDeleteCloudPhoto(doc, 'shared1', 'd1')).toBe(false);
-  });
-
-  it('is false for non-cloud and missing assets', () => {
-    expect(canDeleteCloudPhoto(doc, 'local', 'd1')).toBe(false);
-    expect(canDeleteCloudPhoto(doc, 'nope', 'd1')).toBe(false);
+  it('is null for non-cloud and missing assets', () => {
+    expect(photoLeftUnused(doc, 'local')).toBeNull();
+    expect(photoLeftUnused(doc, 'nope')).toBeNull();
   });
 });
 
@@ -153,5 +149,14 @@ describe('embedPhotos', () => {
     expect(out.assets.ok.src).toBe('data:image/jpeg;base64,/9j/');
     expect(out.assets.gone.src).toBe('sb:d1/gone.jpg');
     expect(out.assets.local.src).toBe('data:image/png;base64,AAAA');
+  });
+});
+
+describe('hashFile', () => {
+  it('gives the same hex SHA-256 for the same bytes, and a different one otherwise', async () => {
+    const a = await hashFile(new Blob([new Uint8Array([1, 2, 3])]));
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(await hashFile(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }))).toBe(a);
+    expect(await hashFile(new Blob([new Uint8Array([1, 2, 4])]))).not.toBe(a);
   });
 });

@@ -12,15 +12,16 @@ import { designFileName, DESIGN_EXT, parseDesign, serializeDesign } from '@/lib/
 import { DEFAULT_SHEET, sheetLayout } from '@/lib/calendar/sheet';
 import { giveCal, TEMPLATES } from '@/lib/calendar/templates';
 import { markThanksSeen, thanksSeen } from '@/lib/support/support';
-import type { CalEl, El, Page, ShapeEl, ShapeKind, SheetSettings, SizeUnit } from '@/lib/calendar/types';
+import type { Asset, CalEl, CalendarDoc, El, Page, ShapeEl, ShapeKind, SheetSettings, SizeUnit } from '@/lib/calendar/types';
 import { clamp, clone, uid } from '@/lib/calendar/utils';
-import { canDeleteCloudPhoto, cloudPath, deletePhoto, embedPhotos, photosOf, PhotoTooLarge, UnreadableImage, uploadPhoto } from '@/lib/cloud/photos';
+import { cloudPath, deletePhoto, embedPhotos, isCloudSrc, type LibraryPhoto, linkPhoto, photoBlob, photoInUse, photoLeftUnused, photosOf, PhotoTooLarge, UnreadableImage, unlinkPhoto, uploadPhoto } from '@/lib/cloud/photos';
 import { importDoc } from '@/lib/cloud/importDoc';
 import { DESIGNS_FULL, MAX_PHOTO_BYTES, megabytes, PHOTO_SPACE_BYTES } from '@/lib/cloud/limits';
 import { copyDesign } from '@/lib/cloud/members';
 import { CloudError } from '@/lib/cloud/transport';
 import { useAuthStore } from './useAuthStore';
 import { confirmReplaceAll, useCloudStore } from './useCloudStore';
+import { useLibraryStore } from './useLibraryStore';
 import { curPage, findEl, type PickTarget, selIds, toast, useStudioStore } from './useStudioStore';
 
 const S = () => useStudioStore.getState();
@@ -161,13 +162,73 @@ export async function addFiles(files: File[]): Promise<string[]> {
   if (designId && useCloudStore.getState().designId !== designId) return [];
   if (!read.length) return ids;
   S().mutate((d) => {
-    for (const { id, a } of read) {
-      d.assets[id] = a;
-      d.tray.unshift(id);
-      ids.push(id);
-    }
+    for (const { id, a } of read) ids.push(addToTray(d, id, a));
   }, { history: false });
+  if (designId) void useLibraryStore.getState().refresh();
   return ids;
+}
+
+/**
+ * Puts photo `a` in the tray as asset `id` and returns the id. A photo already in this design (the
+ * same file uploaded again) keeps its asset and moves to the front instead of showing twice.
+ */
+function addToTray(d: CalendarDoc, id: string, a: Asset): string {
+  const known = isCloudSrc(a.src) ? Object.keys(d.assets).find((k) => d.assets[k].src === a.src) : undefined;
+  if (known) {
+    const i = d.tray.indexOf(known);
+    if (i >= 0) d.tray.splice(i, 1);
+    d.tray.unshift(known);
+    return known;
+  }
+  d.assets[id] = a;
+  d.tray.unshift(id);
+  return id;
+}
+
+/**
+ * Adds a photo from the account's library to this design's photos: nothing new is stored, the design
+ * just links it. Photos stored before sizes were recorded are measured first.
+ */
+export async function addLibraryPhoto(photo: LibraryPhoto): Promise<void> {
+  const designId = useCloudStore.getState().designId;
+  if (!designId || S().readOnly) {
+    S().mutate(() => {}); // says the design is view only
+    return;
+  }
+  try {
+    const path = cloudPath(photo.src)!;
+    const size = photo.w ? photo : await imageSize(await photoBlob(path));
+    await linkPhoto(designId, path);
+    if (useCloudStore.getState().designId !== designId) return;
+    S().mutate((d) => void addToTray(d, 'a' + uid(), { src: photo.src, w: size.w, h: size.h }), { history: false });
+    toast('Photo added. Drag onto the page, a frame, or a day.');
+  } catch (e) {
+    toast(e instanceof CloudError && e.code === 'offline' ? PHOTO_OFFLINE : "Couldn't add that photo. Please try again.");
+  }
+}
+
+/** Deletes a photo from the account's library for good, freeing its space; refused while a design uses it. */
+export async function deleteLibraryPhoto(photo: LibraryPhoto): Promise<void> {
+  const path = cloudPath(photo.src)!;
+  try {
+    if (await photoInUse(path)) {
+      toast('A design still uses this photo. Remove it from that design first.');
+      return;
+    }
+    await deletePhoto(path);
+    useLibraryStore.getState().drop(photo.src);
+    toast('Photo deleted.');
+  } catch (e) {
+    toast(e instanceof CloudError && e.code === 'offline' ? "You're offline. Try again once you're back online." : "Couldn't delete that photo. Please try again.");
+  }
+}
+
+/** Width and height of an image file. */
+async function imageSize(blob: Blob): Promise<{ w: number; h: number }> {
+  const bmp = await createImageBitmap(blob);
+  const size = { w: bmp.width, h: bmp.height };
+  bmp.close();
+  return size;
 }
 
 /** Puts an uploaded photo into a calendar day, a photo frame, or onto the page at `pt`. */
@@ -254,24 +315,27 @@ export function pickMonthBackgrounds() {
 }
 
 /**
- * Removes a photo from the tray; one no element uses is deleted. In a cloud design its stored file
- * goes too, when it is this design's own and no other asset shares it.
+ * Removes a photo from the tray; one no element uses leaves the design. A cloud photo stays in the
+ * account's library (where it can be added back, or deleted to free its space); only the design's
+ * link to it goes.
  */
 export function removeTrayItem(i: number) {
   S().set({ armed: null });
   const designId = useCloudStore.getState().designId;
-  let freed: string | null = null;
+  let unused: string | null = null;
   S().mutate((d) => {
     const id = d.tray[i];
     d.tray.splice(i, 1);
     if (!assetInUse(d, id)) {
-      if (designId && canDeleteCloudPhoto(d, id, designId)) freed = cloudPath(d.assets[id].src);
+      unused = photoLeftUnused(d, id);
       delete d.assets[id];
     }
   }, { history: false });
-  const path = freed as string | null;
-  if (path) {
-    deletePhoto(path).catch(() => toast("The photo is removed, but its space couldn't be freed right now."));
+  const path = unused as string | null;
+  if (designId && path) {
+    unlinkPhoto(designId, path)
+      .then(() => useLibraryStore.getState().refresh())
+      .catch(() => {});
   }
 }
 

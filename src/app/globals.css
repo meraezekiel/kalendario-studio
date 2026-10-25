@@ -117,6 +117,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .tray .t button{position:absolute;bottom:3px;right:3px;width:22px;height:22px;border-radius:6px;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:15px;line-height:1;cursor:pointer}
 .tray .t .bgb{bottom:auto;top:3px;font-size:13px}
 .tray .t .x{right:auto;left:3px;background:rgba(0,0,0,.45);font-size:12px}
+.tray .t .x.sure{background:var(--danger,#c0392b);font-size:12px}
 .empty{border:1.5px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--muted);font-size:12px}
 .isec{border-bottom:1px solid var(--line);padding-bottom:6px}
 .isec summary{cursor:pointer;font:700 11px var(--ui);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:6px 0;list-style:none}

@@ -122,3 +122,13 @@ New accounts can't use the cloud until you approve them. This protects the free 
 - The free Supabase plan pauses a project after about a week with no activity. The site then can't sign in or sync (the local editor still works). Restore it from the dashboard with **Restore project**; nothing is lost. Any regular use keeps it awake.
 - When a new file appears in `supabase/migrations`, push it to both projects (steps 2 and 3) before deploying the code that needs it.
 - Signing out deletes the account's offline design copies from that browser. If some changes haven't synced yet, the app asks first.
+
+## 10. Photo library
+
+Photos belong to the account that uploaded them, not to one design (migration `20261025000001_photo_library`). Each design links to the photos it uses in `public.design_photos`. That link is what lets everyone the design is shared with see them.
+
+- **Photos → More of your photos** lists the account's photos that the open design doesn't use. Adding one only links it, so it takes no extra space. Uploading a file the account already stored (same SHA-256, `photos.hash`) reuses the stored one.
+- Removing a photo from a design only unlinks it. The space comes back when the photo is deleted from **More of your photos**. The database refuses that while any design still links the photo.
+- Deleting a design keeps its photos in the library.
+- A photo an editor uploads into someone else's design is in the editor's library and counts against the editor's space.
+- Template photos stay in their template's folder. Applying a template copies each photo into the library once (hash `copy:<template path>`), so applying it again reuses those copies.
